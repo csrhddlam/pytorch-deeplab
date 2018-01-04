@@ -7,6 +7,30 @@ input_dim: 321
 input_dim: 321
 
 ### shrink data ###
+layer {
+  bottom: "data"
+  top: "data_res05"
+  name: "data_res05"
+  type: "Interp"
+  interp_param {
+    shrink_factor: 2
+    pad_beg: 0
+    pad_end: 0
+  }
+}
+layer {
+  bottom: "data"
+  top: "data_res075"
+  name: "data_res075"
+  type: "Interp"
+  interp_param {
+    shrink_factor: 4
+    zoom_factor: 3
+    pad_beg: 0
+    pad_end: 0
+  }
+}
+
 ###################### resolution 1 #####################
 layer {
 	bottom: "data"
@@ -21705,6 +21729,29 @@ layer {
   }
 }
 ############### upsampling ##################
+layer {
+  bottom: "fc1_voc12_res05"
+  top: "fc1_voc12_res05_interp"
+  name: "fc1_voc12_res05_interp"
+  type: "Interp"
+  interp_param {
+    zoom_factor: 2
+    pad_beg: 0
+    pad_end: 0
+  }
+}
+layer {
+  bottom: "fc1_voc12_res075"
+  top: "fc1_voc12_res075_interp"
+  name: "fc1_voc12_res075_interp"
+  type: "Interp"
+  interp_param {
+    zoom_factor: 4
+    shrink_factor: 3    
+    pad_beg: 0
+    pad_end: 0
+  }
+}
 
 ############### merging multiscale results #####################
 layer {
@@ -21721,4 +21768,23 @@ layer {
 
 
 ##################### original resolution #######################
+layer {
+  name: "fc1_interp"
+  type: "Interp"
+  bottom: "fc_fusion"
+  top: "fc1_interp"
+  interp_param {
+    zoom_factor: 8
+  }
+}
+
+layer {
+  name: "res5c_branch2b_down"
+  type: "Interp"
+  bottom: "res5c_branch2b"
+  top: "res5c_branch2b_down"
+  interp_param {
+    shrink_factor: 2
+  }
+}
 
