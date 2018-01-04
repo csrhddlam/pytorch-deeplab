@@ -60,14 +60,15 @@ class CaffeParamProvider():
 
 def preprocess(img):
     """Changes RGB [0,1] valued image to BGR [0,255] with mean subtracted."""
-    mean_bgr = load_mean_bgr()
-    print 'mean blue', np.mean(mean_bgr[:, :, 0])
-    print 'mean green', np.mean(mean_bgr[:, :, 1])
-    print 'mean red', np.mean(mean_bgr[:, :, 2])
+    # mean_bgr = load_mean_bgr()
+    # print('mean blue', np.mean(mean_bgr[:, :, 0]))
+    # print('mean green', np.mean(mean_bgr[:, :, 1]))
+    # print('mean red', np.mean(mean_bgr[:, :, 2]))
     out = np.copy(img) * 255.0
     out = out[:, :, [2, 1, 0]]  # swap channel from RGB to BGR
-    #out -= mean_bgr
-    out -= mean_bgr.mean(0).mean(0)
+    # out -= mean_bgr
+    # out -= mean_bgr.mean(0).mean(0)
+    out -= 128
     return out
 
 
@@ -80,11 +81,11 @@ def assert_almost_equal(caffe_tensor, th_tensor):
     #    print "caffe", i,  c[:,i]
 
     if t.shape != c.shape:
-        print "t.shape", t.shape
-        print "c.shape", c.shape
+        print("t.shape", t.shape)
+        print("c.shape", c.shape)
 
     d = np.linalg.norm(t - c)
-    print "d", d
+    print("d", d)
     assert d < 500
 
 
@@ -302,14 +303,14 @@ def convert(img, img_p, layers, caffe_fname, pytorch_fname):
 
 def main():
     img = load_image("data/cat.jpg")
-    print img
+    print(img)
     img_p = preprocess(img)
 
     caffe_fname = sys.argv[1] # 'data/train_iter_20000.caffemodel'
     pytorch_fname = sys.argv[2] # 'model/deeplab101.pth'
 
     for layers in [101]:
-        print "CONVERT", layers
+        print("CONVERT", layers)
         convert(img, img_p, layers, caffe_fname, pytorch_fname)
 
 
