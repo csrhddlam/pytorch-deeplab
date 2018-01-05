@@ -15,6 +15,7 @@ import math
 
 os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):
@@ -33,6 +34,7 @@ class AverageMeter(object):
         # self.avg = self.sum / self.count
         self.avg = self.avg * 0.99 + self.val * 0.01
 
+
 if __name__ == "__main__":
     use_gpu = torch.cuda.is_available()
     data_transforms = transforms.Compose([
@@ -40,15 +42,45 @@ if __name__ == "__main__":
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-    pascal_dir = '/media/Work_HD/cxliu/datasets/VOCdevkit/VOC2012/'
-    list_dir = '/media/Work_HD/cxliu/projects/deeplab/list/'
-    model_fname = 'model/deeplab101_epoch%d.pth'
+    pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
+    list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
+    model_fname = 'model/deeplab101_newcode_0.1_0.1_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
 
     if sys.argv[2] == 'train':
-        model.eval() # in order to fix batchnorm
-        model.load_state_dict(torch.load('model/deeplab101_init.pth'))
+        model.eval()  # in order to fix batchnorm
+        state_dict = torch.load('model/deeplab101_init.pth')
+        # if 'fc1_voc12_c0.weight' in state_dict:
+        #     state_dict['fc1_voc12_c0.conv.weight'] = state_dict['fc1_voc12_c0.weight'] \
+        #         .permute(2, 3, 1, 0).contiguous().view(1, 1, -1, 21).contiguous().permute(3, 2, 1, 0)
+        #     del state_dict['fc1_voc12_c0.weight']
+        # if 'fc1_voc12_c1.weight' in state_dict:
+        #     state_dict['fc1_voc12_c1.conv.weight'] = state_dict['fc1_voc12_c1.weight'] \
+        #         .permute(2, 3, 1, 0).contiguous().view(1, 1, -1, 21).contiguous().permute(3, 2, 1, 0)
+        #     del state_dict['fc1_voc12_c1.weight']
+        # if 'fc1_voc12_c2.weight' in state_dict:
+        #     state_dict['fc1_voc12_c2.conv.weight'] = state_dict['fc1_voc12_c2.weight'] \
+        #         .permute(2, 3, 1, 0).contiguous().view(1, 1, -1, 21).contiguous().permute(3, 2, 1, 0)
+        #     del state_dict['fc1_voc12_c2.weight']
+        # if 'fc1_voc12_c3.weight' in state_dict:
+        #     state_dict['fc1_voc12_c3.conv.weight'] = state_dict['fc1_voc12_c3.weight'] \
+        #         .permute(2, 3, 1, 0).contiguous().view(1, 1, -1, 21).contiguous().permute(3, 2, 1, 0)
+        #     del state_dict['fc1_voc12_c3.weight']
+        # if 'fc1_voc12_c0.bias' in state_dict:
+        #     state_dict['fc1_voc12_c0.conv.bias'] = state_dict['fc1_voc12_c0.bias']
+        #     del state_dict['fc1_voc12_c0.bias']
+        # if 'fc1_voc12_c1.bias' in state_dict:
+        #     state_dict['fc1_voc12_c1.conv.bias'] = state_dict['fc1_voc12_c1.bias']
+        #     del state_dict['fc1_voc12_c1.bias']
+        # if 'fc1_voc12_c2.bias' in state_dict:
+        #     state_dict['fc1_voc12_c2.conv.bias'] = state_dict['fc1_voc12_c2.bias']
+        #     del state_dict['fc1_voc12_c2.bias']
+        # if 'fc1_voc12_c3.bias' in state_dict:
+        #     state_dict['fc1_voc12_c3.conv.bias'] = state_dict['fc1_voc12_c3.bias']
+        #     del state_dict['fc1_voc12_c3.bias']
+        model.load_state_dict(state_dict, strict=False)
+
         if use_gpu:
             model = model.cuda()
         num_epochs = 2
@@ -62,14 +94,16 @@ if __name__ == "__main__":
             {'params': model.layer2.parameters()},
             {'params': model.layer3.parameters()},
             {'params': model.layer4.parameters()},
-            {'params': iter([model.fc1_voc12_c0.weight,
-                model.fc1_voc12_c1.weight,
-                model.fc1_voc12_c2.weight,
-                model.fc1_voc12_c3.weight])},
-            {'params': iter([model.fc1_voc12_c0.bias,
-                model.fc1_voc12_c1.bias,
-                model.fc1_voc12_c2.bias,
-                model.fc1_voc12_c3.bias]), 'weight_decay': 0.}],
+            {'params': iter([model.fc1_voc12.conv.weight])},
+            {'params': iter([model.fc1_voc12.conv.bias]), 'weight_decay': 0.},
+            {'params': iter([model.offset_c0.weight,
+                             model.offset_c1.weight,
+                             model.offset_c2.weight,
+                             model.offset_c3.weight])},
+            {'params': iter([model.offset_c0.bias,
+                             model.offset_c1.bias,
+                             model.offset_c2.bias,
+                             model.offset_c3.bias]), 'weight_decay': 0.}],
             lr=base_lr, momentum=0.9, weight_decay=0.0005)
         
         losses = AverageMeter()
@@ -82,6 +116,8 @@ if __name__ == "__main__":
                     optimizer.param_groups[g]['lr'] = lr
                 optimizer.param_groups[6]['lr'] = lr * 10
                 optimizer.param_groups[7]['lr'] = lr * 20
+                optimizer.param_groups[8]['lr'] = lr * 0.1
+                optimizer.param_groups[9]['lr'] = lr * 0.1
 
                 imname, labelname = line
                 im = datasets.folder.default_loader(pascal_dir + imname)
@@ -103,7 +139,7 @@ if __name__ == "__main__":
                 target_down = target_down.view(-1,)
                 mask = torch.lt(target_down, 21)
                 target_down = torch.masked_select(target_down, mask)
-                outputs = torch.masked_select(outputs, mask.repeat(21))
+                outputs = torch.masked_select(outputs.view(-1), mask.repeat(21).view(-1))
                 outputs = torch.t(outputs.view(21, -1))
 
                 loss = criterion(outputs, target_down)
@@ -125,7 +161,36 @@ if __name__ == "__main__":
 
     elif sys.argv[2] == 'eval':
         model.eval()
-        model.load_state_dict(torch.load('model/deeplab101_epoch2.pth'))
+        state_dict = torch.load(model_fname % 2)
+        # if 'fc1_voc12_c0.weight' in state_dict:
+        #     state_dict['fc1_voc12_c0.conv.weight'] = state_dict['fc1_voc12_c0.weight'] \
+        #         .permute(2, 3, 1, 0).contiguous().view(1, 1, -1, 21).contiguous().permute(3, 2, 1, 0)
+        #     del state_dict['fc1_voc12_c0.weight']
+        # if 'fc1_voc12_c1.weight' in state_dict:
+        #     state_dict['fc1_voc12_c1.conv.weight'] = state_dict['fc1_voc12_c1.weight'] \
+        #         .permute(2, 3, 1, 0).contiguous().view(1, 1, -1, 21).contiguous().permute(3, 2, 1, 0)
+        #     del state_dict['fc1_voc12_c1.weight']
+        # if 'fc1_voc12_c2.weight' in state_dict:
+        #     state_dict['fc1_voc12_c2.conv.weight'] = state_dict['fc1_voc12_c2.weight'] \
+        #         .permute(2, 3, 1, 0).contiguous().view(1, 1, -1, 21).contiguous().permute(3, 2, 1, 0)
+        #     del state_dict['fc1_voc12_c2.weight']
+        # if 'fc1_voc12_c3.weight' in state_dict:
+        #     state_dict['fc1_voc12_c3.conv.weight'] = state_dict['fc1_voc12_c3.weight'] \
+        #         .permute(2, 3, 1, 0).contiguous().view(1, 1, -1, 21).contiguous().permute(3, 2, 1, 0)
+        #     del state_dict['fc1_voc12_c3.weight']
+        # if 'fc1_voc12_c0.bias' in state_dict:
+        #     state_dict['fc1_voc12_c0.conv.bias'] = state_dict['fc1_voc12_c0.bias']
+        #     del state_dict['fc1_voc12_c0.bias']
+        # if 'fc1_voc12_c1.bias' in state_dict:
+        #     state_dict['fc1_voc12_c1.conv.bias'] = state_dict['fc1_voc12_c1.bias']
+        #     del state_dict['fc1_voc12_c1.bias']
+        # if 'fc1_voc12_c2.bias' in state_dict:
+        #     state_dict['fc1_voc12_c2.conv.bias'] = state_dict['fc1_voc12_c2.bias']
+        #     del state_dict['fc1_voc12_c2.bias']
+        # if 'fc1_voc12_c3.bias' in state_dict:
+        #     state_dict['fc1_voc12_c3.conv.bias'] = state_dict['fc1_voc12_c3.bias']
+        #     del state_dict['fc1_voc12_c3.bias']
+        model.load_state_dict(state_dict, strict=False)
         if use_gpu:
             model = model.cuda()
 

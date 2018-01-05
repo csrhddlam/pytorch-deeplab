@@ -1,4 +1,4 @@
-seg_root = '/media/Work_HD/cxliu/datasets/VOCdevkit/VOC2012/';
+seg_root = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/';
 seg_res_dir = '../data/val';
 add_colormap = 0;
 evaluate = 1;

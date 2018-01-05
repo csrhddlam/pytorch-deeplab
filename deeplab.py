@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
-
+from modules.DeformConv import ConvOffset2d
+import numpy as np
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
@@ -96,16 +97,30 @@ class ResNet(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1, ceil_mode=True) # change
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2) # deeplab change
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4) # deeplab change
-        self.fc1_voc12_c0 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3, 
-                                      stride=1, dilation=6, padding=6) # deeplab change
-        self.fc1_voc12_c1 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
-                                      stride=1, dilation=12, padding=12) # deeplab change
-        self.fc1_voc12_c2 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3, 
-                                      stride=1, dilation=18, padding=18) # deeplab change
-        self.fc1_voc12_c3 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
-                                      stride=1, dilation=24, padding=24) # deeplab change
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)  # deeplab change
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4)  # deeplab change
+
+        # self.fc1_voc12_c0 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
+        #                               stride=1, dilation=6, padding=6)  # deeplab change
+        # self.fc1_voc12_c1 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
+        #                               stride=1, dilation=12, padding=12)  # deeplab change
+        # self.fc1_voc12_c2 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
+        #                               stride=1, dilation=18, padding=18)  # deeplab change
+        # self.fc1_voc12_c3 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
+        #                               stride=1, dilation=24, padding=24)  # deeplab change
+        self.offset_c0 = nn.Conv2d(512 * block.expansion, 18, kernel_size=3,
+                                   stride=1, dilation=6, padding=6)  # huiyu change
+        self.offset_c1 = nn.Conv2d(512 * block.expansion, 18, kernel_size=3,
+                                   stride=1, dilation=12, padding=12)  # huiyu change
+        self.offset_c2 = nn.Conv2d(512 * block.expansion, 18, kernel_size=3,
+                                   stride=1, dilation=18, padding=18)  # huiyu change
+        self.offset_c3 = nn.Conv2d(512 * block.expansion, 18, kernel_size=3,
+                                   stride=1, dilation=24, padding=24)  # huiyu change
+
+        self.fc1_voc12 = ConvOffset2d(512 * block.expansion, num_classes, 36, 0, 0)  # huiyu change
+
+        base_offset = torch.from_numpy(
+            np.array([-1, -1, -1, 0, -1, 1, 0, -1, 0, 0, 0, 1, 1, -1, 1, 0, 1, 1]).astype(np.float32))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -114,6 +129,19 @@ class ResNet(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
+        # special init for offset layers
+        self.offset_c0.weight.data.zero_()
+        self.offset_c1.weight.data.zero_()
+        self.offset_c2.weight.data.zero_()
+        self.offset_c3.weight.data.zero_()
+        self.offset_c0.bias.data = base_offset * self.offset_c0.dilation[0]
+        self.offset_c1.bias.data = base_offset * self.offset_c1.dilation[0]
+        self.offset_c2.bias.data = base_offset * self.offset_c2.dilation[0]
+        self.offset_c3.bias.data = base_offset * self.offset_c3.dilation[0]
+
+        # set to zero as chenxi did in init model
+        self.fc1_voc12.conv.weight.data.zero_()
+        self.fc1_voc12.conv.bias.data.zero_()
 
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1):
         downsample = None
@@ -143,15 +171,24 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x0 = self.fc1_voc12_c0(x)
-        x1 = self.fc1_voc12_c1(x)
-        x2 = self.fc1_voc12_c2(x)
-        x3 = self.fc1_voc12_c3(x)
+        # deeplab
+        # x0 = self.fc1_voc12_c0(x)
+        # x1 = self.fc1_voc12_c1(x)
+        # x2 = self.fc1_voc12_c2(x)
+        # x3 = self.fc1_voc12_c3(x)
+        #
+        # x = torch.add(x0, x1)
+        # x = torch.add(x, x2)
+        # x = torch.add(x, x3)
 
-        x = torch.add(x0, x1)
-        x = torch.add(x, x2)
-        x = torch.add(x, x3)
+        # huiyu
+        offset_c0 = self.offset_c0(x)
+        offset_c1 = self.offset_c1(x)
+        offset_c2 = self.offset_c2(x)
+        offset_c3 = self.offset_c3(x)
+        offset = torch.cat([offset_c0, offset_c1, offset_c2, offset_c3], 1)
 
+        x = self.fc1_voc12(x, offset)
         return x
 
 
