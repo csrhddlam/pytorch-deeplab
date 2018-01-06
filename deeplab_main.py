@@ -42,8 +42,8 @@ if __name__ == "__main__":
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-    pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
-    list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
+    pascal_dir = '/export/home/hwang157/Data/VOCdevkit2012/VOC2012/'
+    list_dir = '/export/home/hwang157/Data/deeplab_list/'
     model_fname = 'model/deeplab101_newcode_1_1_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
