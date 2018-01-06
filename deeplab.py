@@ -4,6 +4,7 @@ import math
 import torch.utils.model_zoo as model_zoo
 from modules.DeformConv import ConvOffset2d
 import numpy as np
+from torch.autograd import grad, Variable
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
@@ -108,20 +109,25 @@ class ResNet(nn.Module):
         #                               stride=1, dilation=18, padding=18)  # deeplab change
         # self.fc1_voc12_c3 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
         #                               stride=1, dilation=24, padding=24)  # deeplab change
-        self.offset_c0 = nn.Conv2d(512 * block.expansion, 72, kernel_size=3,
+        samples = 9
+        self.offset_c0 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                    stride=1, dilation=6, padding=6)  # huiyu change
-        self.offset_c1 = nn.Conv2d(512 * block.expansion, 72, kernel_size=3,
+        self.offset_c1 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                    stride=1, dilation=12, padding=12)  # huiyu change
-        self.offset_c2 = nn.Conv2d(512 * block.expansion, 72, kernel_size=3,
+        self.offset_c2 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                    stride=1, dilation=18, padding=18)  # huiyu change
-        self.offset_c3 = nn.Conv2d(512 * block.expansion, 72, kernel_size=3,
+        self.offset_c3 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                    stride=1, dilation=24, padding=24)  # huiyu change
 
-        self.fc1_voc12 = ConvOffset2d(512 * block.expansion, num_classes, 36, 0, 0)  # huiyu change
+        self.fc1_voc12 = ConvOffset2d(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
 
+        # base_offset = torch.from_numpy(
+        #     np.array([-1, -1, -1, 0, -1, 1, 0, -1, 0, 0, 0, 1, 1, -1, 1, 0, 1, 1]).astype(np.float32))  # h, w
         base_offset = torch.from_numpy(
-            np.array([-1, -1, -1, 0, -1, 1, 0, -1, 0, 0, 0, 1, 1, -1, 1, 0, 1, 1]).astype(np.float32))
+            np.array([-1, -1, 0, -1, 1, -1, -1, 0, 0, 0, 1, 0, -1, 1, 0, 1, 1, 1]).astype(np.float32))  # w, h
+        self.optimizer = nn.Conv2d(samples * 2 * 21, samples * 2, kernel_size=1)
 
+        self.aux_loss = nn.CrossEntropyLoss()
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -135,12 +141,15 @@ class ResNet(nn.Module):
         self.offset_c2.weight.data.zero_()
         self.offset_c3.weight.data.zero_()
 
-        four_bases = torch.cat([base_offset * 6, base_offset * 12, base_offset * 18, base_offset * 24], 0)
+        # four_bases = torch.cat([base_offset * 6, base_offset * 12, base_offset * 18, base_offset * 24], 0)
+        four_bases = torch.cat([base_offset], 0)
         self.offset_c0.bias.data = four_bases / 4
         self.offset_c1.bias.data = four_bases / 4
         self.offset_c2.bias.data = four_bases / 4
         self.offset_c3.bias.data = four_bases / 4
 
+        self.optimizer.weight.data.zero_()
+        self.optimizer.bias.data.zero_()
         # set to zero as chenxi did in init model
         self.fc1_voc12.conv.weight.data.zero_()
         self.fc1_voc12.conv.bias.data.zero_()
@@ -171,7 +180,7 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-        x = self.layer4(x)
+        feature = x = self.layer4(x)
 
         # deeplab
         # x0 = self.fc1_voc12_c0(x)
@@ -184,13 +193,28 @@ class ResNet(nn.Module):
         # x = torch.add(x, x3)
 
         # huiyu
-        offset_c0 = self.offset_c0(x)
-        offset_c1 = self.offset_c1(x)
-        offset_c2 = self.offset_c2(x)
-        offset_c3 = self.offset_c3(x)
-        offsets = offset_c0 + offset_c1 + offset_c2 + offset_c3
-        x = self.fc1_voc12(x, offsets)
-        return x
+        offset_c0 = self.offset_c0(feature)
+        offset_c1 = self.offset_c1(feature)
+        offset_c2 = self.offset_c2(feature)
+        offset_c3 = self.offset_c3(feature)
+        offset = offset_c0 + offset_c1 + offset_c2 + offset_c3
+
+        output = self.fc1_voc12(feature, offset)
+
+        # auxiliary loss
+        # outputs = torch.t(output.view(21, -1))
+        # delta_offsets = list()
+        # for i in range(21):
+        #     aux_loss = self.aux_loss(outputs, Variable(torch.LongTensor(outputs.size()[0]).cuda().zero_() + i))
+        #     offset_grad, = grad(aux_loss, offset, retain_graph=True, create_graph=True)
+        #     delta_offsets.append(offset_grad)
+        #
+        # temp = torch.cat(delta_offsets, dim=1)
+        # delta_offset = self.optimizer(temp.detach())
+        # offset = offset + delta_offset
+        # output = self.fc1_voc12(feature, offset)
+
+        return output
 
 
 def resnet18(pretrained=False):

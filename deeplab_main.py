@@ -12,6 +12,7 @@ import sys
 import deeplab
 from PIL import Image
 import math
+import datetime
 
 os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
 
@@ -151,6 +152,7 @@ if __name__ == "__main__":
                 if i % iter_size == iter_size - 1:
                     optimizer.step()
 
+                print(datetime.datetime.now())
                 print('epoch: {0}\t'
                       'iter: {1}/{2}\t'
                       'lr: {3:.6f}\t'
