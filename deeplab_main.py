@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = 'model/deeplab101_newcode_0.1_0.1_epoch%d.pth'
+    model_fname = 'model/deeplab101_newcode_1_1_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
 

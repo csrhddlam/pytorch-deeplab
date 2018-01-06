@@ -108,13 +108,13 @@ class ResNet(nn.Module):
         #                               stride=1, dilation=18, padding=18)  # deeplab change
         # self.fc1_voc12_c3 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
         #                               stride=1, dilation=24, padding=24)  # deeplab change
-        self.offset_c0 = nn.Conv2d(512 * block.expansion, 18, kernel_size=3,
+        self.offset_c0 = nn.Conv2d(512 * block.expansion, 72, kernel_size=3,
                                    stride=1, dilation=6, padding=6)  # huiyu change
-        self.offset_c1 = nn.Conv2d(512 * block.expansion, 18, kernel_size=3,
+        self.offset_c1 = nn.Conv2d(512 * block.expansion, 72, kernel_size=3,
                                    stride=1, dilation=12, padding=12)  # huiyu change
-        self.offset_c2 = nn.Conv2d(512 * block.expansion, 18, kernel_size=3,
+        self.offset_c2 = nn.Conv2d(512 * block.expansion, 72, kernel_size=3,
                                    stride=1, dilation=18, padding=18)  # huiyu change
-        self.offset_c3 = nn.Conv2d(512 * block.expansion, 18, kernel_size=3,
+        self.offset_c3 = nn.Conv2d(512 * block.expansion, 72, kernel_size=3,
                                    stride=1, dilation=24, padding=24)  # huiyu change
 
         self.fc1_voc12 = ConvOffset2d(512 * block.expansion, num_classes, 36, 0, 0)  # huiyu change
@@ -134,10 +134,12 @@ class ResNet(nn.Module):
         self.offset_c1.weight.data.zero_()
         self.offset_c2.weight.data.zero_()
         self.offset_c3.weight.data.zero_()
-        self.offset_c0.bias.data = base_offset * self.offset_c0.dilation[0]
-        self.offset_c1.bias.data = base_offset * self.offset_c1.dilation[0]
-        self.offset_c2.bias.data = base_offset * self.offset_c2.dilation[0]
-        self.offset_c3.bias.data = base_offset * self.offset_c3.dilation[0]
+
+        four_bases = torch.cat([base_offset * 6, base_offset * 12, base_offset * 18, base_offset * 24], 0)
+        self.offset_c0.bias.data = four_bases / 4
+        self.offset_c1.bias.data = four_bases / 4
+        self.offset_c2.bias.data = four_bases / 4
+        self.offset_c3.bias.data = four_bases / 4
 
         # set to zero as chenxi did in init model
         self.fc1_voc12.conv.weight.data.zero_()
@@ -186,9 +188,8 @@ class ResNet(nn.Module):
         offset_c1 = self.offset_c1(x)
         offset_c2 = self.offset_c2(x)
         offset_c3 = self.offset_c3(x)
-        offset = torch.cat([offset_c0, offset_c1, offset_c2, offset_c3], 1)
-
-        x = self.fc1_voc12(x, offset)
+        offsets = offset_c0 + offset_c1 + offset_c2 + offset_c3
+        x = self.fc1_voc12(x, offsets)
         return x
 
 
