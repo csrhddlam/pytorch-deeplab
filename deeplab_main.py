@@ -111,6 +111,7 @@ if __name__ == "__main__":
         for epoch in range(num_epochs):
             lines = np.random.permutation(lines)
             for i, line in enumerate(lines):
+                print(type(i), type(line))
                 lr = base_lr * math.pow(1 - float(epoch * len(lines) + i) / (num_epochs * len(lines)), power)
                 for g in range(6):
                     optimizer.param_groups[g]['lr'] = lr
@@ -120,7 +121,7 @@ if __name__ == "__main__":
                 optimizer.param_groups[9]['lr'] = lr * 0.1
 
                 imname, labelname = line
-                im = datasets.folder.default_loader(pascal_dir + imname)
+                im = datasets.folder.default_loader(pascal_dir + str(imname))
                 label = Image.open(pascal_dir + labelname)
                 inputs = data_transforms(im)
                 if use_gpu:
