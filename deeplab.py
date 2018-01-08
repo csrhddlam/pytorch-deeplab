@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
-from modules.DeformConv import ConvOffset2d
+from modules.SampleConv import SampleConv
 import numpy as np
 from torch.autograd import grad, Variable
+from util import *
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
@@ -110,22 +111,24 @@ class ResNet(nn.Module):
         # self.fc1_voc12_c3 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
         #                               stride=1, dilation=24, padding=24)  # deeplab change
         samples = 9
-        self.offset_c0 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
-                                   stride=1, dilation=6, padding=6)  # huiyu change
-        self.offset_c1 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
-                                   stride=1, dilation=12, padding=12)  # huiyu change
-        self.offset_c2 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
-                                   stride=1, dilation=18, padding=18)  # huiyu change
-        self.offset_c3 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
-                                   stride=1, dilation=24, padding=24)  # huiyu change
+        self.conv_to_offset0 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
+                                         stride=1, dilation=6, padding=6)  # huiyu change
+        self.conv_to_offset1 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
+                                         stride=1, dilation=12, padding=12)  # huiyu change
+        self.conv_to_offset2 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
+                                         stride=1, dilation=18, padding=18)  # huiyu change
+        self.conv_to_offset3 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
+                                         stride=1, dilation=24, padding=24)  # huiyu change
 
-        self.fc1_voc12 = ConvOffset2d(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
+        self.sample_conv = SampleConv(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
 
         # base_offset = torch.from_numpy(
         #     np.array([-1, -1, -1, 0, -1, 1, 0, -1, 0, 0, 0, 1, 1, -1, 1, 0, 1, 1]).astype(np.float32))  # h, w
         base_offset = torch.from_numpy(
             np.array([-1, -1, 0, -1, 1, -1, -1, 0, 0, 0, 1, 0, -1, 1, 0, 1, 1, 1]).astype(np.float32))  # w, h
-        self.optimizer = nn.Conv2d(samples * 2 * 21, samples * 2, kernel_size=1)
+
+        self.gradient_to_delta = nn.Conv2d(samples * 2 * 21, samples * 2, kernel_size=1)
+        self.offset_to_delta = nn.Conv2d(samples * 2, samples * 2, kernel_size=1)
 
         self.aux_loss = nn.CrossEntropyLoss()
         for m in self.modules():
@@ -136,23 +139,29 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
         # special init for offset layers
-        self.offset_c0.weight.data.zero_()
-        self.offset_c1.weight.data.zero_()
-        self.offset_c2.weight.data.zero_()
-        self.offset_c3.weight.data.zero_()
+        self.conv_to_offset0.weight.data.zero_()
+        self.conv_to_offset1.weight.data.zero_()
+        self.conv_to_offset2.weight.data.zero_()
+        self.conv_to_offset3.weight.data.zero_()
 
-        # four_bases = torch.cat([base_offset * 6, base_offset * 12, base_offset * 18, base_offset * 24], 0)
-        four_bases = torch.cat([base_offset], 0)
-        self.offset_c0.bias.data = four_bases / 4
-        self.offset_c1.bias.data = four_bases / 4
-        self.offset_c2.bias.data = four_bases / 4
-        self.offset_c3.bias.data = four_bases / 4
+        if samples == 36:
+            four_bases = torch.cat([base_offset * 6, base_offset * 12, base_offset * 18, base_offset * 24], 0)
+        if samples == 9:
+            four_bases = torch.cat([base_offset * 6], 0)
+        self.conv_to_offset0.bias.data = four_bases / 4
+        self.conv_to_offset1.bias.data = four_bases / 4
+        self.conv_to_offset2.bias.data = four_bases / 4
+        self.conv_to_offset3.bias.data = four_bases / 4
 
-        self.optimizer.weight.data.zero_()
-        self.optimizer.bias.data.zero_()
+        self.gradient_to_delta.weight.data.zero_()
+        self.gradient_to_delta.bias.data.zero_()
+
+        self.offset_to_delta.weight.data.zero_()
+        self.offset_to_delta.bias.data.zero_()
+
         # set to zero as chenxi did in init model
-        self.fc1_voc12.conv.weight.data.zero_()
-        self.fc1_voc12.conv.bias.data.zero_()
+        self.sample_conv.conv.weight.data.zero_()
+        self.sample_conv.conv.bias.data.zero_()
 
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1):
         downsample = None
@@ -180,41 +189,59 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-        feature = x = self.layer4(x)
-
-        # deeplab
-        # x0 = self.fc1_voc12_c0(x)
-        # x1 = self.fc1_voc12_c1(x)
-        # x2 = self.fc1_voc12_c2(x)
-        # x3 = self.fc1_voc12_c3(x)
-        #
-        # x = torch.add(x0, x1)
-        # x = torch.add(x, x2)
-        # x = torch.add(x, x3)
+        feature = self.layer4(x)
 
         # huiyu
-        offset_c0 = self.offset_c0(feature)
-        offset_c1 = self.offset_c1(feature)
-        offset_c2 = self.offset_c2(feature)
-        offset_c3 = self.offset_c3(feature)
-        offset = offset_c0 + offset_c1 + offset_c2 + offset_c3
+        offset0 = self.conv_to_offset0(feature)
+        offset1 = self.conv_to_offset1(feature)
+        offset2 = self.conv_to_offset2(feature)
+        offset3 = self.conv_to_offset3(feature)
 
-        output = self.fc1_voc12(feature, offset)
+        offset_step0 = offset0 + offset1 + offset2 + offset3
+
+        output_step0 = self.sample_conv(feature, offset_step0)
 
         # auxiliary loss
-        # outputs = torch.t(output.view(21, -1))
-        # delta_offsets = list()
-        # for i in range(21):
-        #     aux_loss = self.aux_loss(outputs, Variable(torch.LongTensor(outputs.size()[0]).cuda().zero_() + i))
-        #     offset_grad, = grad(aux_loss, offset, retain_graph=True, create_graph=True)
-        #     delta_offsets.append(offset_grad)
-        #
-        # temp = torch.cat(delta_offsets, dim=1)
-        # delta_offset = self.optimizer(temp.detach())
-        # offset = offset + delta_offset
-        # output = self.fc1_voc12(feature, offset)
+        label0 = torch.t(output_step0.view(21, -1))
+        gradients = []
+        for i in range(21):
+            aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + i))
+            # aux_loss = torch.sum(label0)
+            offset_grad, = grad(aux_loss, offset_step0, retain_graph=True, create_graph=True)
+            gradients.append(offset_grad)
 
-        return output
+        gradient = torch.cat(gradients, dim=1).detach()
+        delta_from_offset = self.offset_to_delta(offset_step0)
+        delta_from_gradient = self.gradient_to_delta(gradient * 100000)
+        offset_step1 = offset_step0 + delta_from_offset + delta_from_gradient
+
+        output_step1 = self.sample_conv(feature, offset_step1)
+
+        # printing
+        print_stats_variable(offset_step0, 'Forward:  offset_step0')
+        offset_step0.register_hook(Printer('Backward: offset_step0').general_grad_printer)
+
+        print_stats_variable(gradient, 'Forward:  gradient')
+        gradient.register_hook(Printer('Backward: gradient').general_grad_printer)
+
+        print_stats_variable(delta_from_offset, 'Forward:  delta_from_offset')
+        delta_from_offset.register_hook(Printer('Backward: delta_from_offset').general_grad_printer)
+
+        print_stats_variable(delta_from_gradient, 'Forward:  delta_from_gradient')
+        delta_from_gradient.register_hook(Printer('Backward: delta_from_gradient').general_grad_printer)
+
+        print_stats_variable(offset_step1, 'Forward:  offset_step1')
+        offset_step1.register_hook(Printer('Backward: offset_step1').general_grad_printer)
+
+        print_stats_variable(feature, 'Forward:  feature')
+        feature.register_hook(Printer('Backward: feature').general_grad_printer)
+
+        print_stats_variable(output_step1, 'Forward:  output_step1')
+        output_step1.register_hook(Printer('Backward: output_step1').general_grad_printer)
+
+
+
+        return output_step1
 
 
 def resnet18(pretrained=False):

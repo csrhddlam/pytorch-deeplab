@@ -6,3 +6,4 @@ data/*.caffemodel
 *.pth
 *.png
 .idea
+runs/
