@@ -6,6 +6,7 @@ from modules.SampleConv import SampleConv
 import numpy as np
 from torch.autograd import grad, Variable
 from util import *
+from deeplab_main import *
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
@@ -163,6 +164,11 @@ class ResNet(nn.Module):
         self.sample_conv.conv.weight.data.zero_()
         self.sample_conv.conv.bias.data.zero_()
 
+        self.gradient_to_delta.weight.register_hook(Printer('Backward: gradient_to_delta.weight').general_grad_printer)
+        self.gradient_to_delta.bias.register_hook(Printer('Backward: gradient_to_delta.bias').general_grad_printer)
+        self.offset_to_delta.weight.register_hook(Printer('Backward: offset_to_delta.weight').general_grad_printer)
+        self.offset_to_delta.bias.register_hook(Printer('Backward: offset_to_delta.bias').general_grad_printer)
+
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1):
         downsample = None
         if stride != 1 or dilation != 1 or self.inplanes != planes * block.expansion:
@@ -212,34 +218,37 @@ class ResNet(nn.Module):
 
         gradient = torch.cat(gradients, dim=1).detach()
         delta_from_offset = self.offset_to_delta(offset_step0)
-        delta_from_gradient = self.gradient_to_delta(gradient * 100000)
+        delta_from_gradient = self.gradient_to_delta(gradient * 10000)
         offset_step1 = offset_step0 + delta_from_offset + delta_from_gradient
 
         output_step1 = self.sample_conv(feature, offset_step1)
 
         # printing
+        print_stats_variable(feature, 'Forward:  feature')
+        feature.register_hook(Printer('Backward: feature').general_grad_printer)
+
         print_stats_variable(offset_step0, 'Forward:  offset_step0')
-        offset_step0.register_hook(Printer('Backward: offset_step0').general_grad_printer)
+        # offset_step0.register_hook(Printer('Backward: offset_step0').general_grad_printer)
 
         print_stats_variable(gradient, 'Forward:  gradient')
-        gradient.register_hook(Printer('Backward: gradient').general_grad_printer)
+        # gradient.register_hook(Printer('Backward: gradient').general_grad_printer)
+
+        print_stats_variable(self.offset_to_delta.weight, 'Forward:  offset_to_delta.weight')
+        print_stats_variable(self.offset_to_delta.bias, 'Forward:  offset_to_delta.bias')
+        print_stats_variable(self.gradient_to_delta.weight, 'Forward:  gradient_to_delta.weight')
+        print_stats_variable(self.gradient_to_delta.bias, 'Forward:  gradient_to_delta.bias')
 
         print_stats_variable(delta_from_offset, 'Forward:  delta_from_offset')
-        delta_from_offset.register_hook(Printer('Backward: delta_from_offset').general_grad_printer)
+        # delta_from_offset.register_hook(Printer('Backward: delta_from_offset').general_grad_printer)
 
         print_stats_variable(delta_from_gradient, 'Forward:  delta_from_gradient')
-        delta_from_gradient.register_hook(Printer('Backward: delta_from_gradient').general_grad_printer)
+        # delta_from_gradient.register_hook(Printer('Backward: delta_from_gradient').general_grad_printer)
 
         print_stats_variable(offset_step1, 'Forward:  offset_step1')
         offset_step1.register_hook(Printer('Backward: offset_step1').general_grad_printer)
 
-        print_stats_variable(feature, 'Forward:  feature')
-        feature.register_hook(Printer('Backward: feature').general_grad_printer)
-
         print_stats_variable(output_step1, 'Forward:  output_step1')
         output_step1.register_hook(Printer('Backward: output_step1').general_grad_printer)
-
-
 
         return output_step1
 

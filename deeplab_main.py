@@ -41,60 +41,6 @@ class AverageMeter(object):
         self.avg = self.avg * 0.99 + self.val * 0.01
 
 
-def sample_conv_forward(self, input, output):
-    self.forward_count += 1
-    print('sample_conv_forward: ' + str(len(input)))
-    for a in input:
-        print(a.data.size())
-    if i % tensorboard_step == 0:
-        writer.add_histogram('sample_conv_feature_input' + str(self.forward_count % 2), input[0].clone().cpu().data.numpy(), epoch * len(lines) + i)
-        writer.add_histogram('sample_conv_offset_input' + str(self.forward_count % 2), input[1].clone().cpu().data.numpy(), epoch * len(lines) + i)
-        writer.add_histogram('sample_conv_output' + str(self.forward_count % 2), output.clone().cpu().data.numpy(), epoch * len(lines) + i)
-
-
-def sample_conv_backward(self, grad_input, grad_output):
-    self.backward_count += 1
-    print('sample_conv_backward: ' + str(len(grad_input)))
-    for a in grad_input:
-        print(a.data.size())
-    print('sample_conv_backward: ' + str(len(grad_output)))
-    for a in grad_output:
-        print(a.data.size())
-    if i % tensorboard_step == 0 and self.backward_count % 22 == 21:
-        writer.add_histogram('sample_conv_feature_grad_input' + str(self.backward_count % 22), grad_input[0].clone().cpu().data.numpy(), epoch * len(lines) + i)
-        writer.add_histogram('sample_conv_weight_grad_input' + str(self.backward_count % 22), grad_input[1].clone().cpu().data.numpy(), epoch * len(lines) + i)
-        writer.add_histogram('sample_conv_bias_grad_input' + str(self.backward_count % 22), grad_input[2].clone().cpu().data.numpy(), epoch * len(lines) + i)
-        writer.add_histogram('sample_conv_grad_output' + str(self.backward_count % 22), grad_output[0].clone().cpu().data.numpy(), epoch * len(lines) + i)
-
-
-def optimizer_forward(self, input, output):
-    print('optimizer_forward: ' + str(len(input)))
-    for a in input:
-        print(a.data.size())
-    if i % tensorboard_step == 0:
-        writer.add_histogram('optimizer_input', input[0].clone().cpu().data.numpy(), epoch * len(lines) + i)
-        writer.add_histogram('optimizer_output', output.clone().cpu().data.numpy(), epoch * len(lines) + i)
-    # print('Inside ' + self.__class__.__name__ + ' forward')
-
-
-def optimizer_backward(self, grad_input, grad_output):
-    print('optimizer_backward: ' + str(len(grad_input)))
-    for a in grad_input:
-        if a is None:
-            print('None')
-        else:
-            print(a.data.size())
-    print('optimizer_backward: ' + str(len(grad_output)))
-    for a in grad_output:
-        print(a.data.size())
-    if i % tensorboard_step == 0:
-        # writer.add_histogram('optimizer_grad_input', grad_input[0].clone().cpu().data.numpy(), epoch * len(lines) + i)
-        writer.add_histogram('optimizer_grad_input', grad_input[1].clone().cpu().data.numpy(), epoch * len(lines) + i)
-        writer.add_histogram('optimizer_grad_input', grad_input[2].clone().cpu().data.numpy(), epoch * len(lines) + i)
-        writer.add_histogram('optimizer_grad_output', grad_output[0].clone().cpu().data.numpy(), epoch * len(lines) + i)
-    # print('Inside ' + self.__class__.__name__ + ' backward')
-
-
 if __name__ == "__main__":
     use_gpu = torch.cuda.is_available()
     data_transforms = transforms.Compose([
@@ -104,13 +50,13 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = 'model/deeplab101_stackh_1_1_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
 
     if sys.argv[2] == 'train':
         model.eval()  # in order to fix batchnorm
-        state_dict = torch.load('model/deeplab101_init.pth')
+        state_dict = torch.load('/home/why/Documents/pytorch-deeplab/model/deeplab101_init.pth')
         model.load_state_dict(state_dict, strict=False)
 
         if use_gpu:
@@ -157,10 +103,11 @@ if __name__ == "__main__":
                     optimizer.param_groups[g]['lr'] = lr
                 optimizer.param_groups[6]['lr'] = lr * 10
                 optimizer.param_groups[7]['lr'] = lr * 20
-                optimizer.param_groups[8]['lr'] = lr * 10
-                optimizer.param_groups[9]['lr'] = lr * 10
-                optimizer.param_groups[10]['lr'] = lr * 10
-                optimizer.param_groups[11]['lr'] = lr * 10
+
+                optimizer.param_groups[8]['lr'] = lr * 1
+                optimizer.param_groups[9]['lr'] = lr * 1
+                optimizer.param_groups[10]['lr'] = lr * 1
+                optimizer.param_groups[11]['lr'] = lr * 1
 
                 imname, labelname = line
                 im = datasets.folder.default_loader(pascal_dir + imname)
@@ -232,3 +179,5 @@ if __name__ == "__main__":
             seg = Image.fromarray(pred)
             seg.save('data/val/' + imname + '.png')
             print('processing %d/%d' % (i + 1, len(lines)))
+
+
