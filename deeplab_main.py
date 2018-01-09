@@ -13,10 +13,9 @@ import deeplab
 from PIL import Image
 import math
 import datetime
-from tensorboardX import SummaryWriter
+
 from util import *
 
-writer = SummaryWriter()
 tensorboard_step = 10
 
 os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
@@ -50,7 +49,7 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_0_0_0_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
 
@@ -98,16 +97,18 @@ if __name__ == "__main__":
         for epoch in range(num_epochs):
             lines = np.random.permutation(lines)
             for i, line in enumerate(lines):
+                global_step = epoch * len(lines) + i
+
                 lr = base_lr * math.pow(1 - float(epoch * len(lines) + i) / (num_epochs * len(lines)), power)
                 for g in range(6):
                     optimizer.param_groups[g]['lr'] = lr
                 optimizer.param_groups[6]['lr'] = lr * 10
                 optimizer.param_groups[7]['lr'] = lr * 20
 
-                optimizer.param_groups[8]['lr'] = lr * 1
-                optimizer.param_groups[9]['lr'] = lr * 1
-                optimizer.param_groups[10]['lr'] = lr * 1
-                optimizer.param_groups[11]['lr'] = lr * 1
+                optimizer.param_groups[8]['lr'] = lr * 0
+                optimizer.param_groups[9]['lr'] = lr * 0
+                optimizer.param_groups[10]['lr'] = lr * 0
+                optimizer.param_groups[11]['lr'] = lr * 0
 
                 imname, labelname = line
                 im = datasets.folder.default_loader(pascal_dir + imname)
@@ -149,10 +150,10 @@ if __name__ == "__main__":
                       epoch+1, i+1, len(lines), lr, loss=losses))
 
                 if i % tensorboard_step == 0:
-                    for name, param in model.named_parameters():
-                        if 'layer' not in name:
-                            writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch * len(lines) + i)
-                    writer.add_scalar('training_loss', losses.val, epoch * len(lines) + i)
+                    # for name, param in model.named_parameters():
+                        # if 'layer' not in name:
+                        #     writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch * len(lines) + i)
+                    model.writer.add_scalar('training_loss', losses.val, model.global_step)
 
             torch.save(model.state_dict(), model_fname % (epoch+1))
 
@@ -177,7 +178,7 @@ if __name__ == "__main__":
             _, pred = torch.max(outputs_up, 1)
             pred = pred.data.cpu().numpy().squeeze().astype(np.uint8)
             seg = Image.fromarray(pred)
-            seg.save('data/val/' + imname + '.png')
+            seg.save('data/val1/' + imname + '.png')
             print('processing %d/%d' % (i + 1, len(lines)))
 
 
