@@ -118,6 +118,7 @@ class ResNet(nn.Module):
         self.sample_conv = SampleConv(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
         self.gradient_to_bottle = nn.Conv2d(samples * 2 * 21, bottles, kernel_size=1)
         self.offset_to_bottle = nn.Conv2d(samples * 2, bottles, kernel_size=1)
+        self.bottle_to_bottle = nn.Conv2d(bottles, bottles, kernel_size=1)
         self.bottle_to_delta = nn.Conv2d(bottles, samples * 2, kernel_size=1)
 
         self.aux_loss = nn.CrossEntropyLoss()
@@ -146,11 +147,14 @@ class ResNet(nn.Module):
         self.conv_to_offset2.bias.data = four_bases / 4
         self.conv_to_offset3.bias.data = four_bases / 4
 
-        self.gradient_to_bottle.weight.data = self.gradient_to_bottle.weight.data * 1.0
+        self.gradient_to_bottle.weight.data = self.gradient_to_bottle.weight.data * 0.1
         self.gradient_to_bottle.bias.data.zero_()
 
-        self.offset_to_bottle.weight.data = self.offset_to_bottle.weight.data * 1.0
+        self.offset_to_bottle.weight.data = self.offset_to_bottle.weight.data * 0.1
         self.offset_to_bottle.bias.data.zero_()
+
+        self.bottle_to_bottle.weight.data = self.bottle_to_bottle.weight.data * 1.0
+        self.bottle_to_bottle.bias.data.zero_()
 
         self.bottle_to_delta.weight.data = self.bottle_to_delta.weight.data * 1.0
         self.bottle_to_delta.bias.data.zero_()
@@ -216,8 +220,10 @@ class ResNet(nn.Module):
 
         gradient = torch.cat(gradients, dim=1).detach()
         bottle_from_offset = self.offset_to_bottle(offset_step0)
-        bottle_from_gradient = self.gradient_to_bottle(gradient * 0)
-        delta_offset = self.relu(self.bottle_to_delta(bottle_from_offset + bottle_from_gradient))
+        bottle_from_gradient = self.gradient_to_bottle(gradient * 10000)
+        bottle = self.relu(bottle_from_gradient + bottle_from_offset)
+        bottle = self.relu(self.bottle_to_bottle(bottle))
+        delta_offset = self.bottle_to_delta(bottle)
         offset_step1 = offset_step0 + delta_offset
 
         output_step1 = self.sample_conv(feature, offset_step1)

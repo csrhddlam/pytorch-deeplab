@@ -49,9 +49,10 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_conv_10_10_10000_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_conv2_10_10_10000_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
+    num_epochs = 4
 
     if sys.argv[2] == 'train':
         model.eval()  # in order to fix batchnorm
@@ -60,7 +61,7 @@ if __name__ == "__main__":
 
         if use_gpu:
             model = model.cuda()
-        num_epochs = 2
+
         iter_size = 10
         base_lr = 0.00025 / iter_size 
         power = 0.9
@@ -156,7 +157,7 @@ if __name__ == "__main__":
 
     elif sys.argv[2] == 'eval':
         model.eval()
-        state_dict = torch.load(model_fname % 2)
+        state_dict = torch.load(model_fname % num_epochs)
         model.load_state_dict(state_dict, strict=False)
         if use_gpu:
             model = model.cuda()
