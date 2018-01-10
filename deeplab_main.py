@@ -52,9 +52,9 @@ if __name__ == "__main__":
     model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_conv1_double_10_10_10000_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
-    num_epochs = 4
+    num_epochs = 2
 
-    if sys.argv[2] == 'train':
+    if 'train' in sys.argv[2]:
         model.eval()  # in order to fix batchnorm
         state_dict = torch.load('/home/why/Documents/pytorch-deeplab/model/deeplab101_init.pth')
         model.load_state_dict(state_dict, strict=False)
@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
             torch.save(model.state_dict(), model_fname % (epoch+1))
 
-    elif sys.argv[2] == 'eval':
+    if 'eval' in sys.argv[2]:
         model.eval()
         state_dict = torch.load(model_fname % num_epochs)
         model.load_state_dict(state_dict, strict=False)
@@ -178,7 +178,7 @@ if __name__ == "__main__":
             _, pred = torch.max(outputs_up, 1)
             pred = pred.data.cpu().numpy().squeeze().astype(np.uint8)
             seg = Image.fromarray(pred)
-            seg.save('data/val1/' + imname + '.png')
+            seg.save('data/val' + sys.argv[1] + '/' + imname + '.png')
             print('processing %d/%d' % (i + 1, len(lines)))
 
 
