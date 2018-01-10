@@ -54,7 +54,7 @@ if __name__ == "__main__":
     model = getattr(deeplab, 'resnet101')()
     num_epochs = 4
 
-    if sys.argv[2] == 'train':
+    if 'train' in sys.argv[2]:
         model.eval()  # in order to fix batchnorm
         state_dict = torch.load('/home/why/Documents/pytorch-deeplab/model/deeplab101_init.pth')
         model.load_state_dict(state_dict, strict=False)
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
             torch.save(model.state_dict(), model_fname % (epoch+1))
 
-    elif sys.argv[2] == 'eval':
+    if 'eval' in sys.argv[2]:
         model.eval()
         state_dict = torch.load(model_fname % num_epochs)
         model.load_state_dict(state_dict, strict=False)
