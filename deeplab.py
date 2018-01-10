@@ -265,7 +265,7 @@ class ResNet(nn.Module):
         Printer('Forward:  output_step1', self.writer, self.global_step).print_var_par(output_step1)
         output_step1.register_hook(Printer('Backward: output_step1', self.writer, self.global_step).print_var_par)
 
-        return output_step1
+        return output_step0, output_step1
 
 
 def resnet18(pretrained=False):

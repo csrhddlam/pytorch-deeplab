@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_conv1_10_10_10000_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_conv1_double_10_10_10000_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
     num_epochs = 4
@@ -116,7 +116,7 @@ if __name__ == "__main__":
                     inputs = Variable(inputs.cuda())
                 else:
                     inputs = Variable(inputs)
-                outputs = model(inputs.unsqueeze(0))
+                outputs, outputs1 = model(inputs.unsqueeze(0))
                 w, h = outputs.size()[2], outputs.size()[3]
                 label_down = label.resize((h, w), Image.NEAREST)
                 target_down = torch.LongTensor(np.array(label_down).astype(np.int64))
@@ -130,8 +130,10 @@ if __name__ == "__main__":
                 target_down = torch.masked_select(target_down, mask)
                 outputs = torch.masked_select(outputs.view(-1), mask.repeat(21).view(-1))
                 outputs = torch.t(outputs.view(21, -1))
+                outputs1 = torch.masked_select(outputs1.view(-1), mask.repeat(21).view(-1))
+                outputs1 = torch.t(outputs1.view(21, -1))
+                loss = criterion(outputs, target_down) / 2 + criterion(outputs1, target_down) / 2
 
-                loss = criterion(outputs, target_down)
                 losses.update(loss.data[0], 1)
 
                 if i % iter_size == 0:
@@ -171,7 +173,7 @@ if __name__ == "__main__":
                 inputs = Variable(inputs.cuda())
             else:
                 inputs = Variable(inputs)
-            outputs = model(inputs.unsqueeze(0))
+            _, outputs = model(inputs.unsqueeze(0))
             outputs_up = nn.UpsamplingBilinear2d((w, h))(outputs)
             _, pred = torch.max(outputs_up, 1)
             pred = pred.data.cpu().numpy().squeeze().astype(np.uint8)
