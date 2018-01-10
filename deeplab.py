@@ -116,12 +116,6 @@ class ResNet(nn.Module):
                                          stride=1, dilation=24, padding=24)  # huiyu change
 
         self.sample_conv = SampleConv(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
-
-        # base_offset = torch.from_numpy(
-        #     np.array([-1, -1, -1, 0, -1, 1, 0, -1, 0, 0, 0, 1, 1, -1, 1, 0, 1, 1]).astype(np.float32))  # h, w
-        base_offset = torch.from_numpy(
-            np.array([-1, -1, 0, -1, 1, -1, -1, 0, 0, 0, 1, 0, -1, 1, 0, 1, 1, 1]).astype(np.float32))  # w, h
-
         self.gradient_to_bottle = nn.Conv2d(samples * 2 * 21, bottles, kernel_size=1)
         self.offset_to_bottle = nn.Conv2d(samples * 2, bottles, kernel_size=1)
         self.bottle_to_delta = nn.Conv2d(bottles, samples * 2, kernel_size=1)
@@ -135,25 +129,31 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
         # special init for offset layers
+        base_offset = torch.from_numpy(
+            np.array([-1, -1, 0, -1, 1, -1, -1, 0, 0, 0, 1, 0, -1, 1, 0, 1, 1, 1]).astype(np.float32))  # w, h
+        if samples == 36:
+            four_bases = torch.cat([base_offset * 6, base_offset * 12, base_offset * 18, base_offset * 24], 0)
+        if samples == 9:
+            four_bases = torch.cat([base_offset * 6], 0)
+
         self.conv_to_offset0.weight.data.zero_()
         self.conv_to_offset1.weight.data.zero_()
         self.conv_to_offset2.weight.data.zero_()
         self.conv_to_offset3.weight.data.zero_()
 
-        if samples == 36:
-            four_bases = torch.cat([base_offset * 6, base_offset * 12, base_offset * 18, base_offset * 24], 0)
-        if samples == 9:
-            four_bases = torch.cat([base_offset * 6], 0)
         self.conv_to_offset0.bias.data = four_bases / 4
         self.conv_to_offset1.bias.data = four_bases / 4
         self.conv_to_offset2.bias.data = four_bases / 4
         self.conv_to_offset3.bias.data = four_bases / 4
 
-        self.gradient_to_delta.weight.data.zero_()
-        self.gradient_to_delta.bias.data.zero_()
+        self.gradient_to_bottle.weight.data = self.gradient_to_bottle.weight.data * 1.0
+        self.gradient_to_bottle.bias.data.zero_()
 
-        self.offset_to_delta.weight.data.zero_()
-        self.offset_to_delta.bias.data.zero_()
+        self.offset_to_bottle.weight.data = self.offset_to_bottle.weight.data * 1.0
+        self.offset_to_bottle.bias.data.zero_()
+
+        self.bottle_to_delta.weight.data = self.bottle_to_delta.weight.data * 1.0
+        self.bottle_to_delta.bias.data.zero_()
 
         # set to zero as chenxi did in init model
         self.sample_conv.conv.weight.data.zero_()
@@ -201,7 +201,6 @@ class ResNet(nn.Module):
         offset1 = self.conv_to_offset1(feature)
         offset2 = self.conv_to_offset2(feature)
         offset3 = self.conv_to_offset3(feature)
-
         offset_step0 = offset0 + offset1 + offset2 + offset3
 
         output_step0 = self.sample_conv(feature, offset_step0)
@@ -218,7 +217,7 @@ class ResNet(nn.Module):
         gradient = torch.cat(gradients, dim=1).detach()
         bottle_from_offset = self.offset_to_bottle(offset_step0)
         bottle_from_gradient = self.gradient_to_bottle(gradient * 0)
-        delta_offset = self.bottle_to_delta(bottle_from_offset + bottle_from_gradient)
+        delta_offset = self.relu(self.bottle_to_delta(bottle_from_offset + bottle_from_gradient))
         offset_step1 = offset_step0 + delta_offset
 
         output_step1 = self.sample_conv(feature, offset_step1)
@@ -228,13 +227,15 @@ class ResNet(nn.Module):
         feature.register_hook(Printer('Backward: feature', self.writer, self.global_step).print_var_par)
 
         Printer('Forward:  offset_step0', self.writer, self.global_step).print_var_par(offset_step0)
-
         Printer('Forward:  gradient', self.writer, self.global_step).print_var_par(gradient)
 
         Printer('Forward:  offset_to_bottle.weight', self.writer, self.global_step).print_var_par(self.offset_to_bottle.weight)
         Printer('Forward:  offset_to_bottle.bias', self.writer, self.global_step).print_var_par(self.offset_to_bottle.bias)
         Printer('Forward:  gradient_to_bottle.weight', self.writer, self.global_step).print_var_par(self.gradient_to_bottle.weight)
         Printer('Forward:  gradient_to_bottle.bias', self.writer, self.global_step).print_var_par(self.gradient_to_bottle.bias)
+        Printer('Forward:  bottle_to_delta.weight', self.writer, self.global_step).print_var_par( self.bottle_to_delta.weight)
+        Printer('Forward:  bottle_to_delta.bias', self.writer, self.global_step).print_var_par(self.bottle_to_delta.bias)
+
         self.hooks.append(self.gradient_to_bottle.weight.register_hook(
             Printer('Backward: gradient_to_bottle.weight', self.writer, self.global_step).print_var_par))
         self.hooks.append(self.gradient_to_bottle.bias.register_hook(
@@ -243,6 +244,10 @@ class ResNet(nn.Module):
             Printer('Backward: offset_to_bottle.weight', self.writer, self.global_step).print_var_par))
         self.hooks.append(self.offset_to_bottle.bias.register_hook(
             Printer('Backward: offset_to_bottle.bias', self.writer, self.global_step).print_var_par))
+        self.hooks.append(self.bottle_to_delta.weight.register_hook(
+            Printer('Backward: bottle_to_delta.weight', self.writer, self.global_step).print_var_par))
+        self.hooks.append(self.bottle_to_delta.bias.register_hook(
+            Printer('Backward: bottle_to_delta.bias', self.writer, self.global_step).print_var_par))
 
         Printer('Forward:  bottle_from_offset', self.writer, self.global_step).print_var_par(bottle_from_offset)
         Printer('Forward:  bottle_from_gradient', self.writer, self.global_step).print_var_par(bottle_from_gradient)

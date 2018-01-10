@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_0_0_0_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_conv_10_10_10000_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
 
@@ -81,16 +81,13 @@ if __name__ == "__main__":
                              model.conv_to_offset1.bias,
                              model.conv_to_offset2.bias,
                              model.conv_to_offset3.bias]), 'weight_decay': 0.},
-            {'params': iter([model.gradient_to_delta.weight,
-                             model.offset_to_delta.weight])},
-            {'params': iter([model.gradient_to_delta.bias,
-                             model.offset_to_delta.bias]), 'weight_decay': 0.}],
+            {'params': iter([model.gradient_to_bottle.weight,
+                             model.offset_to_bottle.weight,
+                             model.bottle_to_delta.weight])},
+            {'params': iter([model.gradient_to_bottle.bias,
+                             model.offset_to_bottle.bias,
+                             model.bottle_to_delta.bias]), 'weight_decay': 0.}],
             lr=base_lr, momentum=0.9, weight_decay=0.0005)
-
-        # model.sample_conv.register_forward_hook(general_forward_printer)
-        # model.sample_conv.register_backward_hook(general_backward_printer)
-        # model.optimizer.register_forward_hook(general_forward_printer)
-        # model.optimizer.register_backward_hook(general_backward_printer)
 
         losses = AverageMeter()
         lines = np.loadtxt(list_dir + 'train_aug.txt', dtype=str)
@@ -105,10 +102,10 @@ if __name__ == "__main__":
                 optimizer.param_groups[6]['lr'] = lr * 10
                 optimizer.param_groups[7]['lr'] = lr * 20
 
-                optimizer.param_groups[8]['lr'] = lr * 0
-                optimizer.param_groups[9]['lr'] = lr * 0
-                optimizer.param_groups[10]['lr'] = lr * 0
-                optimizer.param_groups[11]['lr'] = lr * 0
+                optimizer.param_groups[8]['lr'] = lr * 10
+                optimizer.param_groups[9]['lr'] = lr * 10
+                optimizer.param_groups[10]['lr'] = lr * 10
+                optimizer.param_groups[11]['lr'] = lr * 10
 
                 imname, labelname = line
                 im = datasets.folder.default_loader(pascal_dir + imname)
