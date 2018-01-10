@@ -105,6 +105,7 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4)  # deeplab change
 
         samples = 9
+        bottles = samples * 2 * 3
         self.conv_to_offset0 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                          stride=1, dilation=6, padding=6)  # huiyu change
         self.conv_to_offset1 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
@@ -121,8 +122,9 @@ class ResNet(nn.Module):
         base_offset = torch.from_numpy(
             np.array([-1, -1, 0, -1, 1, -1, -1, 0, 0, 0, 1, 0, -1, 1, 0, 1, 1, 1]).astype(np.float32))  # w, h
 
-        self.gradient_to_delta = nn.Conv2d(samples * 2 * 21, samples * 2, kernel_size=1)
-        self.offset_to_delta = nn.Conv2d(samples * 2, samples * 2, kernel_size=1)
+        self.gradient_to_bottle = nn.Conv2d(samples * 2 * 21, bottles, kernel_size=1)
+        self.offset_to_bottle = nn.Conv2d(samples * 2, bottles, kernel_size=1)
+        self.bottle_to_delta = nn.Conv2d(bottles, samples * 2, kernel_size=1)
 
         self.aux_loss = nn.CrossEntropyLoss()
         for m in self.modules():
@@ -160,14 +162,6 @@ class ResNet(nn.Module):
         self.writer = SummaryWriter()
         self.global_step = 0
         self.hooks = list()
-        # self.gradient_to_delta.weight.register_hook(
-        #     Printer('Backward: gradient_to_delta.weight', self.writer, self.global_step).print_var_par)
-        # self.gradient_to_delta.bias.register_hook(
-        #     Printer('Backward: gradient_to_delta.bias', self.writer, self.global_step).print_var_par)
-        # self.offset_to_delta.weight.register_hook(
-        #     Printer('Backward: offset_to_delta.weight', self.writer, self.global_step).print_var_par)
-        # self.offset_to_delta.bias.register_hook(
-        #     Printer('Backward: offset_to_delta.bias', self.writer, self.global_step).print_var_par)
 
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1):
         downsample = None
@@ -222,9 +216,10 @@ class ResNet(nn.Module):
             gradients.append(offset_grad)
 
         gradient = torch.cat(gradients, dim=1).detach()
-        delta_from_offset = self.offset_to_delta(offset_step0)
-        delta_from_gradient = self.gradient_to_delta(gradient * 0)
-        offset_step1 = offset_step0 + delta_from_offset + delta_from_gradient
+        bottle_from_offset = self.offset_to_bottle(offset_step0)
+        bottle_from_gradient = self.gradient_to_bottle(gradient * 0)
+        delta_offset = self.bottle_to_delta(bottle_from_offset + bottle_from_gradient)
+        offset_step1 = offset_step0 + delta_offset
 
         output_step1 = self.sample_conv(feature, offset_step1)
 
@@ -236,22 +231,22 @@ class ResNet(nn.Module):
 
         Printer('Forward:  gradient', self.writer, self.global_step).print_var_par(gradient)
 
-        Printer('Forward:  offset_to_delta.weight', self.writer, self.global_step).print_var_par(self.offset_to_delta.weight)
-        Printer('Forward:  offset_to_delta.bias', self.writer, self.global_step).print_var_par(self.offset_to_delta.bias)
-        Printer('Forward:  gradient_to_delta.weight', self.writer, self.global_step).print_var_par(self.gradient_to_delta.weight)
-        Printer('Forward:  gradient_to_delta.bias', self.writer, self.global_step).print_var_par(self.gradient_to_delta.bias)
-        self.hooks.append(self.gradient_to_delta.weight.register_hook(
-            Printer('Backward: gradient_to_delta.weight', self.writer, self.global_step).print_var_par))
-        self.hooks.append(self.gradient_to_delta.bias.register_hook(
-            Printer('Backward: gradient_to_delta.bias', self.writer, self.global_step).print_var_par))
-        self.hooks.append(self.offset_to_delta.weight.register_hook(
-            Printer('Backward: offset_to_delta.weight', self.writer, self.global_step).print_var_par))
-        self.hooks.append(self.offset_to_delta.bias.register_hook(
-            Printer('Backward: offset_to_delta.bias', self.writer, self.global_step).print_var_par))
+        Printer('Forward:  offset_to_bottle.weight', self.writer, self.global_step).print_var_par(self.offset_to_bottle.weight)
+        Printer('Forward:  offset_to_bottle.bias', self.writer, self.global_step).print_var_par(self.offset_to_bottle.bias)
+        Printer('Forward:  gradient_to_bottle.weight', self.writer, self.global_step).print_var_par(self.gradient_to_bottle.weight)
+        Printer('Forward:  gradient_to_bottle.bias', self.writer, self.global_step).print_var_par(self.gradient_to_bottle.bias)
+        self.hooks.append(self.gradient_to_bottle.weight.register_hook(
+            Printer('Backward: gradient_to_bottle.weight', self.writer, self.global_step).print_var_par))
+        self.hooks.append(self.gradient_to_bottle.bias.register_hook(
+            Printer('Backward: gradient_to_bottle.bias', self.writer, self.global_step).print_var_par))
+        self.hooks.append(self.offset_to_bottle.weight.register_hook(
+            Printer('Backward: offset_to_bottle.weight', self.writer, self.global_step).print_var_par))
+        self.hooks.append(self.offset_to_bottle.bias.register_hook(
+            Printer('Backward: offset_to_bottle.bias', self.writer, self.global_step).print_var_par))
 
-        Printer('Forward:  delta_from_offset', self.writer, self.global_step).print_var_par(delta_from_offset)
-
-        Printer('Forward:  delta_from_gradient', self.writer, self.global_step).print_var_par(delta_from_gradient)
+        Printer('Forward:  bottle_from_offset', self.writer, self.global_step).print_var_par(bottle_from_offset)
+        Printer('Forward:  bottle_from_gradient', self.writer, self.global_step).print_var_par(bottle_from_gradient)
+        Printer('Forward:  delta_offset', self.writer, self.global_step).print_var_par(delta_offset)
 
         Printer('Forward:  offset_step1', self.writer, self.global_step).print_var_par(offset_step1)
         offset_step1.register_hook(Printer('Backward: offset_step1', self.writer, self.global_step).print_var_par)
