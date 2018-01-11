@@ -220,7 +220,7 @@ class ResNet(nn.Module):
 
         gradient = torch.cat(gradients, dim=1).detach()
         bottle_from_offset = self.offset_to_bottle(offset_step0)
-        bottle_from_gradient = self.gradient_to_bottle(gradient * 10000)
+        bottle_from_gradient = self.gradient_to_bottle(gradient * 0)
         bottle = self.relu(bottle_from_gradient + bottle_from_offset)
         # bottle = self.relu(self.bottle_to_bottle(bottle))
         delta_offset = self.bottle_to_delta(bottle)
