@@ -52,7 +52,7 @@ if __name__ == "__main__":
     model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_conv2_10_10_10000_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
-    num_epochs = 2
+    num_epochs = 4
 
     if 'train' in sys.argv[2]:
         model.eval()  # in order to fix batchnorm
