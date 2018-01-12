@@ -218,7 +218,7 @@ class ResNet(nn.Module):
         #     gradients.append(offset_grad)
         # gradient = torch.cat(gradients, dim=1).detach()
 
-        gradient = Variable(torch.zeros(torch.Size(offset_step0)).cuda().repeat(1, 21, 1, 1))
+        gradient = Variable(torch.zeros(offset_step0.size()).cuda().repeat(1, 21, 1, 1))
 
         bottle_from_offset = self.offset_to_bottle(offset_step0)
         bottle_from_gradient = self.gradient_to_bottle(gradient)
