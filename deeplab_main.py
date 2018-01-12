@@ -17,6 +17,8 @@ import datetime
 from util import *
 
 tensorboard_step = 10
+gpu_id = '0'
+
 
 os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
 
@@ -49,7 +51,7 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_conv1_10_10_0_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_baseline_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
     num_epochs = 4

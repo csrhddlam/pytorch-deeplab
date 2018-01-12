@@ -207,20 +207,21 @@ class ResNet(nn.Module):
         offset3 = self.conv_to_offset3(feature)
         offset_step0 = offset0 + offset1 + offset2 + offset3
 
-        output_step0 = self.sample_conv(feature, offset_step0)
+        # auxiliary loss and compute gradient
+        # output_step0 = self.sample_conv(feature, offset_step0)
+        # label0 = torch.t(output_step0.view(21, -1))
+        # gradients = []
+        # for i in range(21):
+        #     aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + i))
+        #     # aux_loss = torch.sum(label0)
+        #     offset_grad, = grad(aux_loss, offset_step0, retain_graph=True, create_graph=True)
+        #     gradients.append(offset_grad)
+        # gradient = torch.cat(gradients, dim=1).detach()
 
-        # auxiliary loss
-        label0 = torch.t(output_step0.view(21, -1))
-        gradients = []
-        for i in range(21):
-            aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + i))
-            # aux_loss = torch.sum(label0)
-            offset_grad, = grad(aux_loss, offset_step0, retain_graph=True, create_graph=True)
-            gradients.append(offset_grad)
+        gradient = Variable(torch.zeros(torch.Size(offset_step0)).cuda().repeat(1, 21, 1, 1))
 
-        gradient = torch.cat(gradients, dim=1).detach()
         bottle_from_offset = self.offset_to_bottle(offset_step0)
-        bottle_from_gradient = self.gradient_to_bottle(gradient * 0)
+        bottle_from_gradient = self.gradient_to_bottle(gradient)
         bottle = self.relu(bottle_from_gradient + bottle_from_offset)
         # bottle = self.relu(self.bottle_to_bottle(bottle))
         delta_offset = self.bottle_to_delta(bottle)
