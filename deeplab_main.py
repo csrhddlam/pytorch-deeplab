@@ -17,7 +17,7 @@ import datetime
 from util import *
 
 tensorboard_step = 10
-gpu_id = '1'
+gpu_id = '2'
 what_to_do = 'train_eval'
 
 os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_deform_baseline_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_base_baseline_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
     num_epochs = 4
@@ -105,8 +105,8 @@ if __name__ == "__main__":
                 optimizer.param_groups[6]['lr'] = lr * 10
                 optimizer.param_groups[7]['lr'] = lr * 20
 
-                optimizer.param_groups[8]['lr'] = lr * 10
-                optimizer.param_groups[9]['lr'] = lr * 10
+                optimizer.param_groups[8]['lr'] = lr * 0
+                optimizer.param_groups[9]['lr'] = lr * 0
                 optimizer.param_groups[10]['lr'] = lr * 10
                 optimizer.param_groups[11]['lr'] = lr * 10
 
