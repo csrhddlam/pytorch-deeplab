@@ -52,7 +52,7 @@ if __name__ == "__main__":
     model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_conv1_double_10_10_10000_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
-    num_epochs = 2
+    num_epochs = 4
 
     if 'train' in sys.argv[2]:
         model.eval()  # in order to fix batchnorm
@@ -66,7 +66,7 @@ if __name__ == "__main__":
         base_lr = 0.00025 / iter_size 
         power = 0.9
         criterion = nn.CrossEntropyLoss().cuda()
-        optimizer = optim.SGD([{'params': model.conv1.parameters()},
+        optimizer = optim.Adam([{'params': model.conv1.parameters()},
             {'params': model.bn1.parameters()},
             {'params': model.layer1.parameters()},
             {'params': model.layer2.parameters()},
@@ -88,7 +88,7 @@ if __name__ == "__main__":
             {'params': iter([model.gradient_to_bottle.bias,
                              model.offset_to_bottle.bias,
                              model.bottle_to_delta.bias]), 'weight_decay': 0.}],
-            lr=base_lr, momentum=0.9, weight_decay=0.0005)
+            lr=base_lr, weight_decay=0.0005)
 
         losses = AverageMeter()
         lines = np.loadtxt(list_dir + 'train_aug.txt', dtype=str)
