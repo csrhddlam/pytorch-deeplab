@@ -5,3 +5,7 @@ data/*.caffemodel
 *.pyc
 *.pth
 *.png
+.idea
+runs/
+*.log
+
