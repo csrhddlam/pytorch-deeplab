@@ -18,9 +18,9 @@ from util import *
 
 tensorboard_step = 10
 gpu_id = '0'
+what_to_do = 'train_eval'
 
-
-os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
+os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
 
 
 class AverageMeter(object):
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     model = getattr(deeplab, 'resnet101')()
     num_epochs = 4
 
-    if 'train' in sys.argv[2]:
+    if 'train' in what_to_do:
         model.eval()  # in order to fix batchnorm
         state_dict = torch.load('/home/why/Documents/pytorch-deeplab/model/deeplab101_init.pth')
         model.load_state_dict(state_dict, strict=False)
@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
             torch.save(model.state_dict(), model_fname % (epoch+1))
 
-    if 'eval' in sys.argv[2]:
+    if 'eval' in what_to_do:
         model.eval()
         state_dict = torch.load(model_fname % num_epochs)
         model.load_state_dict(state_dict, strict=False)
