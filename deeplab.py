@@ -104,7 +104,7 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)  # deeplab change
         self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4)  # deeplab change
 
-        samples = 9
+        samples = 36
         bottles = samples * 2 * 3
         self.conv_to_offset0 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                          stride=1, dilation=6, padding=6)  # huiyu change
@@ -116,10 +116,10 @@ class ResNet(nn.Module):
                                          stride=1, dilation=24, padding=24)  # huiyu change
 
         self.sample_conv = SampleConv(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
-        self.gradient_to_bottle = nn.Conv2d(samples * 2 * 21, bottles, kernel_size=1)
-        self.offset_to_bottle = nn.Conv2d(samples * 2, bottles, kernel_size=1)
+        # self.gradient_to_bottle = nn.Conv2d(samples * 2 * 21, bottles, kernel_size=1)
+        # self.offset_to_bottle = nn.Conv2d(samples * 2, bottles, kernel_size=1)
         # self.bottle_to_bottle = nn.Conv2d(bottles, bottles, kernel_size=1)
-        self.bottle_to_delta = nn.Conv2d(bottles, samples * 2, kernel_size=1)
+        # self.bottle_to_delta = nn.Conv2d(bottles, samples * 2, kernel_size=1)
 
         self.aux_loss = nn.CrossEntropyLoss()
         for m in self.modules():
@@ -147,17 +147,17 @@ class ResNet(nn.Module):
         self.conv_to_offset2.bias.data = four_bases / 4
         self.conv_to_offset3.bias.data = four_bases / 4
 
-        self.gradient_to_bottle.weight.data = self.gradient_to_bottle.weight.data * 0.1
-        self.gradient_to_bottle.bias.data.zero_()
+        # self.gradient_to_bottle.weight.data = self.gradient_to_bottle.weight.data * 0.1
+        # self.gradient_to_bottle.bias.data.zero_()
 
-        self.offset_to_bottle.weight.data = self.offset_to_bottle.weight.data * 0.1
-        self.offset_to_bottle.bias.data.zero_()
+        # self.offset_to_bottle.weight.data = self.offset_to_bottle.weight.data * 0.1
+        # self.offset_to_bottle.bias.data.zero_()
 
         # self.bottle_to_bottle.weight.data = self.bottle_to_bottle.weight.data * 1.0
         # self.bottle_to_bottle.bias.data.zero_()
 
-        self.bottle_to_delta.weight.data = self.bottle_to_delta.weight.data * 1.0
-        self.bottle_to_delta.bias.data.zero_()
+        # self.bottle_to_delta.weight.data = self.bottle_to_delta.weight.data * 1.0
+        # self.bottle_to_delta.bias.data.zero_()
 
         # set to zero as chenxi did in init model
         self.sample_conv.conv.weight.data.zero_()

@@ -18,7 +18,7 @@ from util import *
 
 tensorboard_step = 10
 gpu_id = '2'
-what_to_do = 'train_eval'
+what_to_do = 'eval'
 
 os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
 
