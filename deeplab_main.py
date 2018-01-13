@@ -178,7 +178,7 @@ if __name__ == "__main__":
             _, pred = torch.max(outputs_up, 1)
             pred = pred.data.cpu().numpy().squeeze().astype(np.uint8)
             seg = Image.fromarray(pred)
-            seg.save('data/val' + sys.argv[1] + '/' + imname + '.png')
+            seg.save('data/val' + gpu_id + '/' + imname + '.png')
             print('processing %d/%d' % (i + 1, len(lines)))
 
 
