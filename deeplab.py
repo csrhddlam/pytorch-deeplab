@@ -104,7 +104,7 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)  # deeplab change
         self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4)  # deeplab change
 
-        samples = 36
+        samples = 9
         bottles = samples * 2 * 3
         self.conv_to_offset0 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                          stride=1, dilation=6, padding=6)  # huiyu change
