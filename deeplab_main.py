@@ -59,6 +59,14 @@ if __name__ == "__main__":
     if 'train' in what_to_do:
         model.eval()  # in order to fix batchnorm
         state_dict = torch.load('/home/why/Documents/pytorch-deeplab/model/deeplab101_init.pth')
+
+        # [512, 512, 3, 3] to [512, 4608, 1, 1]
+        state_dict['layer4.0.conv2.conv.weight'] = \
+            state_dict['layer4.0.conv2.weight'].permute(0, 2, 3, 1).contiguous().view(512, -1, 1, 1)
+        state_dict['layer4.1.conv2.conv.weight'] = \
+            state_dict['layer4.1.conv2.weight'].permute(0, 2, 3, 1).contiguous().view(512, -1, 1, 1)
+        state_dict['layer4.2.conv2.conv.weight'] = \
+            state_dict['layer4.2.conv2.weight'].permute(0, 2, 3, 1).contiguous().view(512, -1, 1, 1)
         model.load_state_dict(state_dict, strict=False)
 
         if use_gpu:
@@ -68,6 +76,14 @@ if __name__ == "__main__":
         base_lr = 0.00025 / iter_size 
         power = 0.9
         criterion = nn.CrossEntropyLoss().cuda()
+
+
+        # layer4_normal_parameters = list()
+        # for name, parameter in model.layer4.named_parameters():
+        #     if 'offset' in name:
+        #     else:
+        #         layer4_normal_parameters
+
         optimizer = optim.Adam([{'params': model.conv1.parameters()},
             {'params': model.bn1.parameters()},
             {'params': model.layer1.parameters()},
@@ -84,13 +100,14 @@ if __name__ == "__main__":
                              model.conv_to_offset1.bias,
                              model.conv_to_offset2.bias,
                              model.conv_to_offset3.bias]), 'weight_decay': 0.},
-            {'params': iter([model.gradient_to_bottle.weight,
-                             model.offset_to_bottle.weight,
-                             model.bottle_to_delta.weight])},
-            {'params': iter([model.gradient_to_bottle.bias,
-                             model.offset_to_bottle.bias,
-                             model.bottle_to_delta.bias]), 'weight_decay': 0.}],
-            lr=base_lr, weight_decay=0.0005)
+            # {'params': iter([model.gradient_to_bottle.weight,
+            #                  model.offset_to_bottle.weight,
+            #                  model.bottle_to_delta.weight])},
+            # {'params': iter([model.gradient_to_bottle.bias,
+            #                  model.offset_to_bottle.bias,
+            #                  model.bottle_to_delta.bias]), 'weight_decay': 0.},
+                                ],
+            lr=base_lr, weight_decay=0.05)
 
         losses = AverageMeter()
         lines = np.loadtxt(list_dir + 'train_aug.txt', dtype=str)
@@ -105,10 +122,10 @@ if __name__ == "__main__":
                 optimizer.param_groups[6]['lr'] = lr * 10
                 optimizer.param_groups[7]['lr'] = lr * 20
 
-                optimizer.param_groups[8]['lr'] = lr * 10
-                optimizer.param_groups[9]['lr'] = lr * 10
-                optimizer.param_groups[10]['lr'] = lr * 10
-                optimizer.param_groups[11]['lr'] = lr * 10
+                optimizer.param_groups[8]['lr'] = lr * 0
+                optimizer.param_groups[9]['lr'] = lr * 0
+                # optimizer.param_groups[10]['lr'] = lr * 10
+                # optimizer.param_groups[11]['lr'] = lr * 10
 
                 imname, labelname = line
                 im = datasets.folder.default_loader(pascal_dir + imname)
