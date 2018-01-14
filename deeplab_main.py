@@ -17,7 +17,7 @@ import datetime
 from util import *
 
 tensorboard_step = 10
-gpu_id = '1'
+gpu_id = '2'
 what_to_do = 'train_eval'
 
 os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
