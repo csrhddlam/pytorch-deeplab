@@ -106,16 +106,16 @@ class ResNet(nn.Module):
 
         samples = 36
         # bottles = samples * 2 * 3
-        self.conv_to_offset0 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
+        self.top_offset0 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                          stride=1, dilation=6, padding=6)  # huiyu change
-        self.conv_to_offset1 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
+        self.top_offset1 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                          stride=1, dilation=12, padding=12)  # huiyu change
-        self.conv_to_offset2 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
+        self.top_offset2 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                          stride=1, dilation=18, padding=18)  # huiyu change
-        self.conv_to_offset3 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
+        self.top_offset3 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
                                          stride=1, dilation=24, padding=24)  # huiyu change
 
-        self.sample_conv = SampleConv(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
+        self.top = SampleConv(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
         # self.gradient_to_bottle = nn.Conv2d(samples * 2 * 21, bottles, kernel_size=1)
         # self.offset_to_bottle = nn.Conv2d(samples * 2, bottles, kernel_size=1)
         # self.bottle_to_bottle = nn.Conv2d(bottles, bottles, kernel_size=1)
@@ -145,15 +145,15 @@ class ResNet(nn.Module):
         if samples == 9:
             four_bases = torch.cat([base_offset * 6], 0)
 
-        self.conv_to_offset0.weight.data.zero_()
-        self.conv_to_offset1.weight.data.zero_()
-        self.conv_to_offset2.weight.data.zero_()
-        self.conv_to_offset3.weight.data.zero_()
+        self.top_offset0.weight.data.zero_()
+        self.top_offset1.weight.data.zero_()
+        self.top_offset2.weight.data.zero_()
+        self.top_offset3.weight.data.zero_()
 
-        self.conv_to_offset0.bias.data = four_bases / 4
-        self.conv_to_offset1.bias.data = four_bases / 4
-        self.conv_to_offset2.bias.data = four_bases / 4
-        self.conv_to_offset3.bias.data = four_bases / 4
+        self.top_offset0.bias.data = four_bases / 4
+        self.top_offset1.bias.data = four_bases / 4
+        self.top_offset2.bias.data = four_bases / 4
+        self.top_offset3.bias.data = four_bases / 4
 
         # self.gradient_to_bottle.weight.data = self.gradient_to_bottle.weight.data * 0.1
         # self.gradient_to_bottle.bias.data.zero_()
@@ -168,8 +168,8 @@ class ResNet(nn.Module):
         # self.bottle_to_delta.bias.data.zero_()
 
         # set to zero as chenxi did in init model
-        self.sample_conv.conv.weight.data.zero_()
-        self.sample_conv.conv.bias.data.zero_()
+        self.top.conv.weight.data.zero_()
+        self.top.conv.bias.data.zero_()
 
         self.writer = SummaryWriter()
         self.global_step = 0
@@ -209,10 +209,10 @@ class ResNet(nn.Module):
         feature = self.layer4(x)
 
         # huiyu
-        offset0 = self.conv_to_offset0(feature)
-        offset1 = self.conv_to_offset1(feature)
-        offset2 = self.conv_to_offset2(feature)
-        offset3 = self.conv_to_offset3(feature)
+        offset0 = self.top_offset0(feature)
+        offset1 = self.top_offset1(feature)
+        offset2 = self.top_offset2(feature)
+        offset3 = self.top_offset3(feature)
         offset_step0 = offset0 + offset1 + offset2 + offset3
 
         # auxiliary loss and compute gradient
@@ -235,7 +235,7 @@ class ResNet(nn.Module):
         # delta_offset = self.bottle_to_delta(bottle)
         offset_step1 = offset_step0  # + delta_offset
 
-        output_step1 = self.sample_conv(feature, offset_step1)
+        output_step1 = self.top(feature, offset_step1)
 
         # printing
         # Printer('Forward:  feature', self.writer, self.global_step).print_var_par(feature)

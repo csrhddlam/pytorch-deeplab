@@ -13,11 +13,12 @@ import deeplab
 from PIL import Image
 import math
 import datetime
+from itertools import chain
 
 from util import *
 
 tensorboard_step = 10
-gpu_id = '1'
+gpu_id = '2'
 what_to_do = 'train_eval'
 
 os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
@@ -57,7 +58,7 @@ if __name__ == "__main__":
     num_epochs = 4
 
     if 'train' in what_to_do:
-        model.eval()  # in order to fix batchnorm
+        model.eval()  # in order to fix batch norm
         state_dict = torch.load('/home/why/Documents/pytorch-deeplab/model/deeplab101_init.pth')
 
         # [512, 512, 3, 3] to [512, 4608, 1, 1]
@@ -73,41 +74,83 @@ if __name__ == "__main__":
             model = model.cuda()
 
         iter_size = 10
-        base_lr = 0.00025 / iter_size 
+        base_lr = 0.00025 / iter_size
         power = 0.9
         criterion = nn.CrossEntropyLoss().cuda()
 
+        fixed = list()  # usually batch norms
+        lower_weight = list()
+        lower_bias = list()
+        higher_normal_weight = list()
+        higher_normal_bias = list()
+        higher_offset_weight = list()
+        higher_offset_bias = list()
+        top_normal_weight = list()
+        top_normal_bias = list()
+        top_offset_weight = list()
+        top_offset_bias = list()
 
-        # layer4_normal_parameters = list()
-        # for name, parameter in model.layer4.named_parameters():
-        #     if 'offset' in name:
-        #     else:
-        #         layer4_normal_parameters
+        for name, parameter in model.named_parameters():
+            print(name)
+            if 'layer4' in name:
+                if 'offset' in name:
+                    if 'weight' in name:
+                        higher_offset_weight.append(parameter)
+                    elif 'bias' in name:
+                        higher_offset_bias.append(parameter)
+                    else:
+                        fixed.append(parameter)
+                elif 'downsample' in name or 'conv' in name or 'bn' in name:
+                    if 'weight' in name:
+                        higher_normal_weight.append(parameter)
+                    elif 'bias' in name:
+                        higher_normal_bias.append(parameter)
+                    else:
+                        fixed.append(parameter)
+                else:
+                    fixed.append(parameter)
+            elif 'top_offset' in name:
+                if 'weight' in name:
+                    top_offset_weight.append(parameter)
+                elif 'bias' in name:
+                    top_offset_bias.append(parameter)
+                else:
+                    fixed.append(parameter)
+            elif 'top' in name:
+                if 'weight' in name:
+                    top_normal_weight.append(parameter)
+                elif 'bias' in name:
+                    top_normal_bias.append(parameter)
+                else:
+                    fixed.append(parameter)
+            else:  # lower layers
+                if 'downsample' in name or 'conv' in name or 'bn' in name:
+                    if 'weight' in name:
+                        lower_weight.append(parameter)
+                    elif 'bias' in name:
+                        lower_bias.append(parameter)
+                    else:
+                        fixed.append(parameter)
+                else:
+                    fixed.append(parameter)
 
-        optimizer = optim.Adam([{'params': model.conv1.parameters()},
-            {'params': model.bn1.parameters()},
-            {'params': model.layer1.parameters()},
-            {'params': model.layer2.parameters()},
-            {'params': model.layer3.parameters()},
-            {'params': model.layer4.parameters()},
-            {'params': iter([model.sample_conv.conv.weight])},
-            {'params': iter([model.sample_conv.conv.bias]), 'weight_decay': 0.},
-            {'params': iter([model.conv_to_offset0.weight,
-                             model.conv_to_offset1.weight,
-                             model.conv_to_offset2.weight,
-                             model.conv_to_offset3.weight])},
-            {'params': iter([model.conv_to_offset0.bias,
-                             model.conv_to_offset1.bias,
-                             model.conv_to_offset2.bias,
-                             model.conv_to_offset3.bias]), 'weight_decay': 0.},
-            # {'params': iter([model.gradient_to_bottle.weight,
-            #                  model.offset_to_bottle.weight,
-            #                  model.bottle_to_delta.weight])},
-            # {'params': iter([model.gradient_to_bottle.bias,
-            #                  model.offset_to_bottle.bias,
-            #                  model.bottle_to_delta.bias]), 'weight_decay': 0.},
-                                ],
-            lr=base_lr, weight_decay=0.05)
+        optimizer = optim.Adam([{'params': iter(lower_weight)},
+                                {'params': iter(lower_bias), 'weight_decay': 0.},
+                                {'params': iter(higher_offset_weight)},
+                                {'params': iter(higher_offset_bias), 'weight_decay': 0.},
+                                {'params': iter(higher_normal_weight)},
+                                {'params': iter(higher_normal_bias), 'weight_decay': 0.},
+                                {'params': iter(top_offset_weight)},
+                                {'params': iter(top_offset_bias), 'weight_decay': 0.},
+                                {'params': iter(top_normal_weight)},
+                                {'params': iter(top_normal_bias), 'weight_decay': 0.},
+                                # {'params': iter([model.gradient_to_bottle.weight,
+                                #                  model.offset_to_bottle.weight,
+                                #                  model.bottle_to_delta.weight])},
+                                # {'params': iter([model.gradient_to_bottle.bias,
+                                #                  model.offset_to_bottle.bias,
+                                #                  model.bottle_to_delta.bias]), 'weight_decay': 0.},
+                                ], lr=base_lr, weight_decay=0.0005)
 
         losses = AverageMeter()
         lines = np.loadtxt(list_dir + 'train_aug.txt', dtype=str)
@@ -117,15 +160,22 @@ if __name__ == "__main__":
                 global_step = epoch * len(lines) + i
 
                 lr = base_lr * math.pow(1 - float(epoch * len(lines) + i) / (num_epochs * len(lines)), power)
-                for g in range(6):
-                    optimizer.param_groups[g]['lr'] = lr
-                optimizer.param_groups[6]['lr'] = lr * 10
-                optimizer.param_groups[7]['lr'] = lr * 20
 
-                optimizer.param_groups[8]['lr'] = lr * 0
-                optimizer.param_groups[9]['lr'] = lr * 0
-                # optimizer.param_groups[10]['lr'] = lr * 10
-                # optimizer.param_groups[11]['lr'] = lr * 10
+                # lower
+                optimizer.param_groups[0]['lr'] = lr
+                optimizer.param_groups[1]['lr'] = lr
+                # higher offset
+                optimizer.param_groups[2]['lr'] = lr * 10
+                optimizer.param_groups[3]['lr'] = lr * 10
+                # higher normal
+                optimizer.param_groups[4]['lr'] = lr * 10
+                optimizer.param_groups[5]['lr'] = lr * 10
+                # top offset
+                optimizer.param_groups[6]['lr'] = lr * 10
+                optimizer.param_groups[7]['lr'] = lr * 10
+                # top normal
+                optimizer.param_groups[8]['lr'] = lr * 10
+                optimizer.param_groups[9]['lr'] = lr * 10
 
                 imname, labelname = line
                 im = datasets.folder.default_loader(pascal_dir + imname)
