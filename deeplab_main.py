@@ -168,8 +168,8 @@ if __name__ == "__main__":
                 optimizer.param_groups[2]['lr'] = lr * 0
                 optimizer.param_groups[3]['lr'] = lr * 0
                 # higher normal
-                optimizer.param_groups[4]['lr'] = lr * 10
-                optimizer.param_groups[5]['lr'] = lr * 10
+                optimizer.param_groups[4]['lr'] = lr * 1
+                optimizer.param_groups[5]['lr'] = lr * 1
                 # top offset
                 optimizer.param_groups[6]['lr'] = lr * 0
                 optimizer.param_groups[7]['lr'] = lr * 0
