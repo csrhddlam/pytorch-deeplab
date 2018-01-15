@@ -18,7 +18,7 @@ from itertools import chain
 from util import *
 
 tensorboard_step = 10
-gpu_id = '2'
+gpu_id = '1'
 what_to_do = 'train_eval'
 
 os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
@@ -171,8 +171,8 @@ if __name__ == "__main__":
                 optimizer.param_groups[4]['lr'] = lr * 10
                 optimizer.param_groups[5]['lr'] = lr * 10
                 # top offset
-                optimizer.param_groups[6]['lr'] = lr * 10
-                optimizer.param_groups[7]['lr'] = lr * 10
+                optimizer.param_groups[6]['lr'] = lr * 0
+                optimizer.param_groups[7]['lr'] = lr * 0
                 # top normal
                 optimizer.param_groups[8]['lr'] = lr * 10
                 optimizer.param_groups[9]['lr'] = lr * 10
