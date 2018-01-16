@@ -172,7 +172,7 @@ if __name__ == "__main__":
                 optimizer.param_groups[7]['lr'] = lr * 10
                 # top normal
                 optimizer.param_groups[8]['lr'] = lr * 10
-                optimizer.param_groups[9]['lr'] = lr * 10
+                optimizer.param_groups[9]['lr'] = lr * 20
 
                 imname, labelname = line
                 im = datasets.folder.default_loader(pascal_dir + imname)
