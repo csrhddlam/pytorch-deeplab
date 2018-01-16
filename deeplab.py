@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
-from modules.SampleConv import SampleConv, SampleBottleneck
+from modules.SampleConv import SampleConv
+from modules.SampleBottleneck import SampleBottleneck
 import numpy as np
 from torch.autograd import grad, Variable
 from util import *
