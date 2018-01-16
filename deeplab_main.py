@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_deform_baseline_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
     num_epochs = 4
@@ -172,7 +172,7 @@ if __name__ == "__main__":
                 optimizer.param_groups[7]['lr'] = lr * 10
                 # top normal
                 optimizer.param_groups[8]['lr'] = lr * 10
-                optimizer.param_groups[9]['lr'] = lr * 10
+                optimizer.param_groups[9]['lr'] = lr * 20
 
                 imname, labelname = line
                 im = datasets.folder.default_loader(pascal_dir + imname)
