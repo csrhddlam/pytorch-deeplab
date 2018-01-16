@@ -219,8 +219,8 @@ class ResNet(nn.Module):
         offset1 = self.top_offset1(feature)
         offset2 = self.top_offset2(feature)
         offset3 = self.top_offset3(feature)
-        offset_step0 = offset0 + offset1 + offset2 + offset3
-        output_step0 = self.top(feature, offset_step0)
+        offset = offset0 + offset1 + offset2 + offset3
+        output = self.top(feature, offset)
 
         # initialize lists
         need_updates = list()
@@ -230,8 +230,12 @@ class ResNet(nn.Module):
                 need_updates.append(module.need_update)
                 grad_updates.append(module.grad_update)
 
+        for index in range(len(need_updates)):
+            Printer('Forward:  update0_block' + str(index), self.writer, self.global_step).print_var_par(need_updates[index])
+            # need_updates[index].register_hook(Printer('Backward: update0_block' + str(index), self.writer, self.global_step).print_var_par)
+
         # auxiliary loss and compute gradient
-        label0 = torch.t(output_step0.view(21, -1))
+        label0 = torch.t(output.view(21, -1))
         for class_id in range(21):
             aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + class_id))
             # aux_loss = torch.sum(label0)
@@ -245,9 +249,12 @@ class ResNet(nn.Module):
         offset1 = self.top_offset1(feature)
         offset2 = self.top_offset2(feature)
         offset3 = self.top_offset3(feature)
-        offset_step0 = offset0 + offset1 + offset2 + offset3
-        output_step1 = self.top(feature, offset_step0)
+        offset = offset0 + offset1 + offset2 + offset3
+        output = self.top(feature, offset)
 
+        for index in range(len(need_updates)):
+            Printer('Forward:  update1_block' + str(index), self.writer, self.global_step).print_var_par(need_updates[index])
+            need_updates[index].register_hook(Printer('Backward: update1_block' + str(index), self.writer, self.global_step).print_var_par)
         # output_step1 = self.top(feature, offset_step1)
 
         # printing
@@ -287,7 +294,7 @@ class ResNet(nn.Module):
         # Printer('Forward:  output_step1', self.writer, self.global_step).print_var_par(output_step1)
         # output_step1.register_hook(Printer('Backward: output_step1', self.writer, self.global_step).print_var_par)
 
-        return output_step1
+        return output
 
 
 def resnet18(pretrained=False):
