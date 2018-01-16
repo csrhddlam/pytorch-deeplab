@@ -62,12 +62,9 @@ if __name__ == "__main__":
         state_dict = torch.load('/home/why/Documents/pytorch-deeplab/model/deeplab101_init.pth')
 
         # [512, 512, 3, 3] to [512, 4608, 1, 1]
-        state_dict['layer4.0.conv2.conv.weight'] = \
-            state_dict['layer4.0.conv2.weight'].permute(0, 2, 3, 1).contiguous().view(512, -1, 1, 1)
-        state_dict['layer4.1.conv2.conv.weight'] = \
-            state_dict['layer4.1.conv2.weight'].permute(0, 2, 3, 1).contiguous().view(512, -1, 1, 1)
-        state_dict['layer4.2.conv2.conv.weight'] = \
-            state_dict['layer4.2.conv2.weight'].permute(0, 2, 3, 1).contiguous().view(512, -1, 1, 1)
+        state_dict['layer4.0.conv2.conv.weight'] = state_dict['layer4.0.conv2.weight'].view(512, -1, 1, 1)
+        state_dict['layer4.1.conv2.conv.weight'] = state_dict['layer4.1.conv2.weight'].view(512, -1, 1, 1)
+        state_dict['layer4.2.conv2.conv.weight'] = state_dict['layer4.2.conv2.weight'].view(512, -1, 1, 1)
         model.load_state_dict(state_dict, strict=False)
 
         if use_gpu:
