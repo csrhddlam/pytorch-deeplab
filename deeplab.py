@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
-from modules.SampleConv import SampleConv, SampleBottleneck
+from modules.SampleConv import SampleConv
+from modules.SampleBottleneck import SampleBottleneck, UpdateSampleBottleneck
 import numpy as np
 from torch.autograd import grad, Variable
 from util import *
@@ -102,7 +103,7 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)  # deeplab change
-        self.layer4 = self._make_layer(SampleBottleneck, 512, layers[3], stride=1, dilation=4)  # deeplab change
+        self.layer4 = self._make_layer(UpdateSampleBottleneck, 512, layers[3], stride=1, dilation=4)  # deeplab change
 
         samples = 36
         # bottles = samples * 2 * 3
@@ -198,6 +199,11 @@ class ResNet(nn.Module):
             hook.remove()
         self.hooks = list()
 
+        for module in self.modules():
+            if hasattr(module, 'need_update'):
+                module.need_update = None
+                module.grad_update.clear()
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -206,36 +212,43 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-        feature = self.layer4(x)
 
-        # huiyu
+        # first forward: output_step0
+        feature = self.layer4(x)
         offset0 = self.top_offset0(feature)
         offset1 = self.top_offset1(feature)
         offset2 = self.top_offset2(feature)
         offset3 = self.top_offset3(feature)
         offset_step0 = offset0 + offset1 + offset2 + offset3
+        output_step0 = self.top(feature, offset_step0)
+
+        # initialize lists
+        need_updates = list()
+        grad_updates = list()
+        for module in self.modules():
+            if hasattr(module, 'need_update'):
+                need_updates.append(module.need_update)
+                grad_updates.append(module.grad_update)
 
         # auxiliary loss and compute gradient
-        # output_step0 = self.sample_conv(feature, offset_step0)
-        # label0 = torch.t(output_step0.view(21, -1))
-        # gradients = []
-        # for i in range(21):
-        #     aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + i))
-        #     # aux_loss = torch.sum(label0)
-        #     offset_grad, = grad(aux_loss, offset_step0, retain_graph=True, create_graph=True)
-        #     gradients.append(offset_grad)
-        # gradient = torch.cat(gradients, dim=1).detach()
+        label0 = torch.t(output_step0.view(21, -1))
+        for class_id in range(21):
+            aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + class_id))
+            # aux_loss = torch.sum(label0)
+            gradient = grad(aux_loss, need_updates, retain_graph=True, create_graph=True)
+            for variable_id in range(len(grad_updates)):
+                grad_updates[variable_id].append(gradient[variable_id].detach())
 
-        # gradient = Variable(torch.zeros(offset_step0.size()).cuda().repeat(1, 21, 1, 1))
-        #
-        # bottle_from_offset = self.offset_to_bottle(offset_step0)
-        # bottle_from_gradient = self.gradient_to_bottle(gradient)
-        # bottle = self.relu(bottle_from_gradient + bottle_from_offset)
-        # bottle = self.relu(self.bottle_to_bottle(bottle))
-        # delta_offset = self.bottle_to_delta(bottle)
-        offset_step1 = offset_step0  # + delta_offset
+        # last forward: output_step1
+        feature = self.layer4(x)
+        offset0 = self.top_offset0(feature)
+        offset1 = self.top_offset1(feature)
+        offset2 = self.top_offset2(feature)
+        offset3 = self.top_offset3(feature)
+        offset_step0 = offset0 + offset1 + offset2 + offset3
+        output_step1 = self.top(feature, offset_step0)
 
-        output_step1 = self.top(feature, offset_step1)
+        # output_step1 = self.top(feature, offset_step1)
 
         # printing
         # Printer('Forward:  feature', self.writer, self.global_step).print_var_par(feature)
