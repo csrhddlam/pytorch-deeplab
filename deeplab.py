@@ -225,14 +225,16 @@ class ResNet(nn.Module):
         # initialize lists
         need_updates = list()
         grad_updates = list()
+        module_updates = list()
         for module in self.modules():
             if hasattr(module, 'need_update'):
                 need_updates.append(module.need_update)
                 grad_updates.append(module.grad_update)
+                module_updates.append(module)
 
         for index in range(len(need_updates)):
-            Printer('Forward:  update0_block' + str(index), self.writer, self.global_step).print_var_par(need_updates[index])
-            # need_updates[index].register_hook(Printer('Backward: update0_block' + str(index), self.writer, self.global_step).print_var_par)
+            Printer('Forward:  update0_block' + str(index), self.writer, self.global_step).print_var_par(module_updates[index].need_update)
+            # module_updates[index].need_update.register_hook(Printer('Backward: update0_block' + str(index), self.writer, self.global_step).print_var_par)
 
         # auxiliary loss and compute gradient
         label0 = torch.t(output.view(21, -1))
@@ -252,9 +254,9 @@ class ResNet(nn.Module):
         offset = offset0 + offset1 + offset2 + offset3
         output = self.top(feature, offset)
 
-        for index in range(len(need_updates)):
-            Printer('Forward:  update1_block' + str(index), self.writer, self.global_step).print_var_par(need_updates[index])
-            need_updates[index].register_hook(Printer('Backward: update1_block' + str(index), self.writer, self.global_step).print_var_par)
+        for index in range(len(module_updates)):
+            Printer('Forward:  update1_block' + str(index), self.writer, self.global_step).print_var_par(module_updates[index].need_update)
+            module_updates[index].need_update.register_hook(Printer('Backward: update1_block' + str(index), self.writer, self.global_step).print_var_par)
         # output_step1 = self.top(feature, offset_step1)
 
         # printing
