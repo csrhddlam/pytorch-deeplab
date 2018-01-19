@@ -214,7 +214,8 @@ class ResNet(nn.Module):
         x = self.layer3(x)
 
         # first forward: output_step0
-        feature = self.layer4(x)
+        x_detach = x.detach()
+        feature = self.layer4(x_detach)
         offset0 = self.top_offset0(feature)
         offset1 = self.top_offset1(feature)
         offset2 = self.top_offset2(feature)
@@ -237,13 +238,19 @@ class ResNet(nn.Module):
             # module_updates[index].need_update.register_hook(Printer('Backward: update0_block' + str(index), self.writer, self.global_step).print_var_par)
 
         # auxiliary loss and compute gradient
-        label0 = torch.t(output.view(21, -1))
+        # label0 = torch.t(output.view(21, -1))
+        # for class_id in range(21):
+        #     aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + class_id))
+        #     gradient = grad(aux_loss, need_updates, retain_graph=True, create_graph=False)
+        #     for variable_id in range(len(grad_updates)):
+        #         gradient[variable_id].volatile = False
+        #         # gradients are not volatile and do not require gradient
+        #         grad_updates[variable_id].append(gradient[variable_id])
+
         for class_id in range(21):
-            aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + class_id))
-            # aux_loss = torch.sum(label0)
-            gradient = grad(aux_loss, need_updates, retain_graph=True, create_graph=True)
             for variable_id in range(len(grad_updates)):
-                grad_updates[variable_id].append(gradient[variable_id].detach())
+                # gradients are not volatile and do not require gradient
+                grad_updates[variable_id].append(need_updates[variable_id].detach() * 0)
 
         # last forward: output_step1
         feature = self.layer4(x)
@@ -256,7 +263,7 @@ class ResNet(nn.Module):
 
         for index in range(len(module_updates)):
             Printer('Forward:  update1_block' + str(index), self.writer, self.global_step).print_var_par(module_updates[index].need_update)
-            module_updates[index].need_update.register_hook(Printer('Backward: update1_block' + str(index), self.writer, self.global_step).print_var_par)
+            # module_updates[index].need_update.register_hook(Printer('Backward: update1_block' + str(index), self.writer, self.global_step).print_var_par)
         # output_step1 = self.top(feature, offset_step1)
 
         # printing
