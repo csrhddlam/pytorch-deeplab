@@ -212,9 +212,9 @@ class ResNet(nn.Module):
             # auxiliary losses and compute gradients
             label0 = torch.t(output.view(21, -1))
             for class_id in range(1):
-                # _, fake_gt = torch.max(label0, dim=1)
-                # aux_loss = aux_loss
-                aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + class_id))
+                _, fake_gt = torch.max(label0, dim=1)
+                aux_loss = self.aux_loss(label0, fake_gt)
+                # aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + class_id))
                 gradient = grad(aux_loss, need_updates, retain_graph=True, create_graph=False)
                 for variable_id in range(len(grad_updates)):
                     gradient[variable_id].volatile = False
