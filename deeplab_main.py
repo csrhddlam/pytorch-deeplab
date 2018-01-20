@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_zero_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_deform36_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')(pretrained=False, num_classes=21, samples=samples, update=update)
     num_epochs = 4

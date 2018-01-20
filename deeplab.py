@@ -105,7 +105,7 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)  # deeplab change
-        self.layer4 = self._make_layer(UpdateSampleBottleneck, 512, layers[3], stride=1, dilation=4)  # deeplab change
+        self.layer4 = self._make_layer(SampleBottleneck, 512, layers[3], stride=1, dilation=4)  # deeplab change
 
         self.top_offset = SampleConv(512 * block.expansion, samples * 2, samples, 0, 0, groups=1)
         self.top = SampleConv(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
@@ -189,10 +189,10 @@ class ResNet(nn.Module):
         offset_offset = Variable(temp, requires_grad=False)
 
         # first forward: output_step0
-        x_detach = x.detach()
-        feature = self.layer4(x_detach)
-        offset = self.top_offset(feature, offset_offset)
-        output = self.top(feature, offset)
+        # x_detach = x.detach()
+        # feature = self.layer4(x_detach)
+        # offset = self.top_offset(feature, offset_offset)
+        # output = self.top(feature, offset)
 
         # initialize lists
         need_updates = list()
