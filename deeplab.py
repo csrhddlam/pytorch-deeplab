@@ -3,6 +3,7 @@ import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
 from modules.SampleConv import SampleConv
+from modules.UpdateConv2d import UpdateConv2d
 from modules.SampleBottleneck import SampleBottleneck, UpdateSampleBottleneck
 import numpy as np
 from torch.autograd import grad, Variable
@@ -59,7 +60,7 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, stride=stride, bias=False) # change
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, # deeplab change
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1,  # deeplab change
                                dilation=dilation, padding=dilation, bias=False)
         self.bn2 = nn.BatchNorm2d(planes)
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
@@ -92,8 +93,9 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, layers, num_classes=21):
+    def __init__(self, block, layers, num_classes, samples, update):
         self.inplanes = 64
+        self.update = update
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
@@ -105,34 +107,28 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)  # deeplab change
         self.layer4 = self._make_layer(UpdateSampleBottleneck, 512, layers[3], stride=1, dilation=4)  # deeplab change
 
-        samples = 36
-        # bottles = samples * 2 * 3
-        self.top_offset0 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
-                                         stride=1, dilation=6, padding=6)  # huiyu change
-        self.top_offset1 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
-                                         stride=1, dilation=12, padding=12)  # huiyu change
-        self.top_offset2 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
-                                         stride=1, dilation=18, padding=18)  # huiyu change
-        self.top_offset3 = nn.Conv2d(512 * block.expansion, samples * 2, kernel_size=3,
-                                         stride=1, dilation=24, padding=24)  # huiyu change
-
+        self.top_offset = SampleConv(512 * block.expansion, samples * 2, samples, 0, 0, groups=1)
         self.top = SampleConv(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
-        # self.gradient_to_bottle = nn.Conv2d(samples * 2 * 21, bottles, kernel_size=1)
-        # self.offset_to_bottle = nn.Conv2d(samples * 2, bottles, kernel_size=1)
-        # self.bottle_to_bottle = nn.Conv2d(bottles, bottles, kernel_size=1)
-        # self.bottle_to_delta = nn.Conv2d(bottles, samples * 2, kernel_size=1)
 
         self.aux_loss = nn.CrossEntropyLoss()
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
+                if m.bias is not None:
+                    m.bias.data.zero_()
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
+
         # special init for offset layers
         base_offset = torch.from_numpy(
             np.array([-1, -1, 0, -1, 1, -1, -1, 0, 0, 0, 1, 0, -1, 1, 0, 1, 1, 1]).astype(np.float32))  # w, h
+
+        if samples == 36:
+            self.top_offset_bias = torch.cat([base_offset * 6, base_offset * 12, base_offset * 18, base_offset * 24], 0)
+        if samples == 9:
+            self.top_offset_bias = torch.cat([base_offset * 6], 0)
 
         self.layer4[0].conv2_offset.weight.data.zero_()
         self.layer4[0].conv2_offset.bias.data = torch.cat([base_offset * 4], 0)
@@ -140,33 +136,8 @@ class ResNet(nn.Module):
         self.layer4[1].conv2_offset.bias.data = torch.cat([base_offset * 4], 0)
         self.layer4[2].conv2_offset.weight.data.zero_()
         self.layer4[2].conv2_offset.bias.data = torch.cat([base_offset * 4], 0)
-
-        if samples == 36:
-            four_bases = torch.cat([base_offset * 6, base_offset * 12, base_offset * 18, base_offset * 24], 0)
-        if samples == 9:
-            four_bases = torch.cat([base_offset * 6], 0)
-
-        self.top_offset0.weight.data.zero_()
-        self.top_offset1.weight.data.zero_()
-        self.top_offset2.weight.data.zero_()
-        self.top_offset3.weight.data.zero_()
-
-        self.top_offset0.bias.data = four_bases / 4
-        self.top_offset1.bias.data = four_bases / 4
-        self.top_offset2.bias.data = four_bases / 4
-        self.top_offset3.bias.data = four_bases / 4
-
-        # self.gradient_to_bottle.weight.data = self.gradient_to_bottle.weight.data * 0.1
-        # self.gradient_to_bottle.bias.data.zero_()
-
-        # self.offset_to_bottle.weight.data = self.offset_to_bottle.weight.data * 0.1
-        # self.offset_to_bottle.bias.data.zero_()
-
-        # self.bottle_to_bottle.weight.data = self.bottle_to_bottle.weight.data * 1.0
-        # self.bottle_to_bottle.bias.data.zero_()
-
-        # self.bottle_to_delta.weight.data = self.bottle_to_delta.weight.data * 1.0
-        # self.bottle_to_delta.bias.data.zero_()
+        self.top_offset.conv.weight.data.zero_()
+        self.top_offset.conv.bias.data = self.top_offset_bias
 
         # set to zero as chenxi did in init model
         self.top.conv.weight.data.zero_()
@@ -213,14 +184,14 @@ class ResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
 
+        # deformable convolution offset sample points
+        temp = self.top_offset_bias.cuda().view(1, -1, 1, 1).expand(1, -1, x.size(2), x.size(3))
+        offset_offset = Variable(temp, requires_grad=False)
+
         # first forward: output_step0
         x_detach = x.detach()
         feature = self.layer4(x_detach)
-        offset0 = self.top_offset0(feature)
-        offset1 = self.top_offset1(feature)
-        offset2 = self.top_offset2(feature)
-        offset3 = self.top_offset3(feature)
-        offset = offset0 + offset1 + offset2 + offset3
+        offset = self.top_offset(feature, offset_offset)
         output = self.top(feature, offset)
 
         # initialize lists
@@ -237,34 +208,30 @@ class ResNet(nn.Module):
             Printer('Forward:  update0_block' + str(index), self.writer, self.global_step).print_var_par(module_updates[index].need_update)
             # module_updates[index].need_update.register_hook(Printer('Backward: update0_block' + str(index), self.writer, self.global_step).print_var_par)
 
-        # auxiliary loss and compute gradient
-        # label0 = torch.t(output.view(21, -1))
-        # for class_id in range(21):
-        #     aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + class_id))
-        #     gradient = grad(aux_loss, need_updates, retain_graph=True, create_graph=False)
-        #     for variable_id in range(len(grad_updates)):
-        #         gradient[variable_id].volatile = False
-        #         # gradients are not volatile and do not require gradient
-        #         grad_updates[variable_id].append(gradient[variable_id])
-
-        for class_id in range(21):
-            for variable_id in range(len(grad_updates)):
-                # gradients are not volatile and do not require gradient
-                grad_updates[variable_id].append(need_updates[variable_id].detach() * 0)
+        if self.update:
+            # auxiliary losses and compute gradients
+            label0 = torch.t(output.view(21, -1))
+            for class_id in range(21):
+                aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + class_id))
+                gradient = grad(aux_loss, need_updates, retain_graph=True, create_graph=False)
+                for variable_id in range(len(grad_updates)):
+                    gradient[variable_id].volatile = False
+                    # gradients are not volatile and do not require gradient
+                    grad_updates[variable_id].append(gradient[variable_id])
+        else:
+            # trivial zero gradients
+            for class_id in range(21):
+                for variable_id in range(len(grad_updates)):
+                    grad_updates[variable_id].append(need_updates[variable_id].detach() * 0)
 
         # last forward: output_step1
         feature = self.layer4(x)
-        offset0 = self.top_offset0(feature)
-        offset1 = self.top_offset1(feature)
-        offset2 = self.top_offset2(feature)
-        offset3 = self.top_offset3(feature)
-        offset = offset0 + offset1 + offset2 + offset3
+        offset = self.top_offset(feature, offset_offset)
         output = self.top(feature, offset)
 
         for index in range(len(module_updates)):
             Printer('Forward:  update1_block' + str(index), self.writer, self.global_step).print_var_par(module_updates[index].need_update)
             # module_updates[index].need_update.register_hook(Printer('Backward: update1_block' + str(index), self.writer, self.global_step).print_var_par)
-        # output_step1 = self.top(feature, offset_step1)
 
         # printing
         # Printer('Forward:  feature', self.writer, self.global_step).print_var_par(feature)
@@ -336,13 +303,16 @@ def resnet50(pretrained=False):
     return model
 
 
-def resnet101(pretrained=False):
+def resnet101(pretrained=False, num_classes=21, samples=36, update=False):
     """Constructs a ResNet-101 model.
 
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
+        num_classes
+        samples
+        update
     """
-    model = ResNet(Bottleneck, [3, 4, 23, 3])
+    model = ResNet(Bottleneck, [3, 4, 23, 3], num_classes=num_classes, samples=samples, update=update)
     return model
 
 

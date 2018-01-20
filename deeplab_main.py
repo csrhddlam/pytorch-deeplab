@@ -14,14 +14,18 @@ from PIL import Image
 import math
 import datetime
 from itertools import chain
-
 from util import *
 
-tensorboard_step = 10
-gpu_id = '1'
+
+gpu_id = '0'
+samples = 36
+update = False
+higher_deform = 1
+top_deform = 1
 what_to_do = 'train_eval'
 
 os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
+tensorboard_step = 10
 
 
 class AverageMeter(object):
@@ -52,9 +56,9 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_zero1_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_zero_epoch%d.pth'
 
-    model = getattr(deeplab, 'resnet101')()
+    model = getattr(deeplab, 'resnet101')(pretrained=False, num_classes=21, samples=samples, update=update)
     num_epochs = 4
 
     if 'train' in what_to_do:
@@ -141,12 +145,6 @@ if __name__ == "__main__":
                                 {'params': iter(top_offset_bias), 'weight_decay': 0.},
                                 {'params': iter(top_normal_weight)},
                                 {'params': iter(top_normal_bias), 'weight_decay': 0.},
-                                # {'params': iter([model.gradient_to_bottle.weight,
-                                #                  model.offset_to_bottle.weight,
-                                #                  model.bottle_to_delta.weight])},
-                                # {'params': iter([model.gradient_to_bottle.bias,
-                                #                  model.offset_to_bottle.bias,
-                                #                  model.bottle_to_delta.bias]), 'weight_decay': 0.},
                                 ], lr=base_lr, weight_decay=0.0005)
 
         losses = AverageMeter()
@@ -161,18 +159,19 @@ if __name__ == "__main__":
                 # lower
                 optimizer.param_groups[0]['lr'] = lr
                 optimizer.param_groups[1]['lr'] = lr
-                # higher offset
-                optimizer.param_groups[2]['lr'] = lr * 10
-                optimizer.param_groups[3]['lr'] = lr * 10
                 # higher normal
                 optimizer.param_groups[4]['lr'] = lr * 1
                 optimizer.param_groups[5]['lr'] = lr * 1
-                # top offset
-                optimizer.param_groups[6]['lr'] = lr * 10
-                optimizer.param_groups[7]['lr'] = lr * 10
                 # top normal
                 optimizer.param_groups[8]['lr'] = lr * 10
                 optimizer.param_groups[9]['lr'] = lr * 20
+
+                # higher offset
+                optimizer.param_groups[2]['lr'] = lr * 10 * higher_deform
+                optimizer.param_groups[3]['lr'] = lr * 10 * higher_deform
+                # top offset
+                optimizer.param_groups[6]['lr'] = lr * 10 * top_deform
+                optimizer.param_groups[7]['lr'] = lr * 10 * top_deform
 
                 imname, labelname = line
                 im = datasets.folder.default_loader(pascal_dir + imname)
