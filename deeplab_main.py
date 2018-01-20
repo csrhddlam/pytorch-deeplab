@@ -18,7 +18,7 @@ from util import *
 
 
 gpu_id = '0'
-samples = 36
+samples = 9
 update = False
 higher_deform = 1
 top_deform = 1

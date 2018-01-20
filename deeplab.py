@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
-from modules.SampleConv import SampleConv
+from modules.SampleConv import SampleConv, UpdateSampleConv
 from modules.UpdateConv2d import UpdateConv2d
 from modules.SampleBottleneck import SampleBottleneck, UpdateSampleBottleneck
 import numpy as np
@@ -107,7 +107,7 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)  # deeplab change
         self.layer4 = self._make_layer(UpdateSampleBottleneck, 512, layers[3], stride=1, dilation=4)  # deeplab change
 
-        self.top_offset = SampleConv(512 * block.expansion, samples * 2, samples, 0, 0, groups=1)
+        self.top_offset = UpdateSampleConv(512 * block.expansion, samples * 2, samples, 0, 0, groups=1)
         self.top = SampleConv(512 * block.expansion, num_classes, samples, 0, 0, groups=1)  # huiyu change
 
         self.aux_loss = nn.CrossEntropyLoss()
@@ -211,7 +211,9 @@ class ResNet(nn.Module):
         if self.update:
             # auxiliary losses and compute gradients
             label0 = torch.t(output.view(21, -1))
-            for class_id in range(21):
+            for class_id in range(1):
+                # _, fake_gt = torch.max(label0, dim=1)
+                # aux_loss = aux_loss
                 aux_loss = self.aux_loss(label0, Variable(torch.LongTensor(label0.size()[0]).cuda().zero_() + class_id))
                 gradient = grad(aux_loss, need_updates, retain_graph=True, create_graph=False)
                 for variable_id in range(len(grad_updates)):
@@ -220,7 +222,7 @@ class ResNet(nn.Module):
                     grad_updates[variable_id].append(gradient[variable_id])
         else:
             # trivial zero gradients
-            for class_id in range(21):
+            for class_id in range(1):
                 for variable_id in range(len(grad_updates)):
                     grad_updates[variable_id].append(need_updates[variable_id].detach() * 0)
 
