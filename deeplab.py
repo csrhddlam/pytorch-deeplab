@@ -166,10 +166,13 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         self.global_step += 1
+
+        # clear hooks
         for hook in self.hooks:
             hook.remove()
         self.hooks = list()
 
+        # clear need_update and grad_update
         for module in self.modules():
             if hasattr(module, 'need_update'):
                 module.need_update = None
@@ -194,7 +197,7 @@ class ResNet(nn.Module):
         offset = self.top_offset(feature, offset_offset)
         output = self.top(feature, offset)
 
-        # initialize lists
+        # initialize lists and append need_update to lists
         need_updates = list()
         grad_updates = list()
         module_updates = list()

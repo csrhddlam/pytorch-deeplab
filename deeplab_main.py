@@ -17,15 +17,16 @@ from itertools import chain
 from util import *
 
 
-gpu_id = '1'
+gpu_id = '0'
 samples = 9
-update = True
+update = False
 higher_deform = 1
 top_deform = 1
 what_to_do = 'train_eval'
 
 os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
 tensorboard_step = 10
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 
 class AverageMeter(object):
@@ -56,7 +57,7 @@ if __name__ == "__main__":
 
     pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
     list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
-    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_grad_zero_epoch%d.pth'
+    model_fname = '/home/why/Documents/pytorch-deeplab/model/deeplab101_deform9updater_true2_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')(pretrained=False, num_classes=21, samples=samples, update=update)
     num_epochs = 4
