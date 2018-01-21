@@ -236,7 +236,7 @@ class ResNet(nn.Module):
 
         for index in range(len(module_updates)):
             Printer('Forward:  update1_block' + str(index), self.writer, self.global_step).print_var_par(module_updates[index].need_update)
-            # module_updates[index].need_update.register_hook(Printer('Backward: update1_block' + str(index), self.writer, self.global_step).print_var_par)
+            module_updates[index].need_update.register_hook(Printer('Backward: update1_block' + str(index), self.writer, self.global_step).print_var_par)
 
         # printing
         # Printer('Forward:  feature', self.writer, self.global_step).print_var_par(feature)

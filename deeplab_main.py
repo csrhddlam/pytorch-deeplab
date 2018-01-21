@@ -17,9 +17,9 @@ from itertools import chain
 from util import *
 
 
-gpu_id = '0'
+gpu_id = '2'
 samples = 9
-update = False
+update = True
 higher_deform = 1
 top_deform = 1
 what_to_do = 'train_eval'
