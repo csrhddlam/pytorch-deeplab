@@ -5,3 +5,4 @@ data/*.caffemodel
 *.pyc
 *.pth
 *.png
+.idea

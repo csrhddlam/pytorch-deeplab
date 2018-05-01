@@ -40,8 +40,8 @@ if __name__ == "__main__":
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-    pascal_dir = '/media/Work_HD/cxliu/datasets/VOCdevkit/VOC2012/'
-    list_dir = '/media/Work_HD/cxliu/projects/deeplab/list/'
+    pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
+    list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
     model_fname = 'model/deeplab101_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
@@ -103,7 +103,7 @@ if __name__ == "__main__":
                 target_down = target_down.view(-1,)
                 mask = torch.lt(target_down, 21)
                 target_down = torch.masked_select(target_down, mask)
-                outputs = torch.masked_select(outputs, mask.repeat(21))
+                outputs = torch.masked_select(outputs.view(-1), mask.repeat(21).view(-1))
                 outputs = torch.t(outputs.view(21, -1))
 
                 loss = criterion(outputs, target_down)
