@@ -80,7 +80,7 @@ if __name__ == "__main__":
                 model.fc1_voc12_c2.bias,
                 model.fc1_voc12_c3.bias]), 'weight_decay': 0.}],
             lr=base_lr, momentum=0.9, weight_decay=0.0005)
-        
+        np.random.seed(1234)
         losses = AverageMeter()
         lines = np.loadtxt(list_dir + 'train_aug.txt', dtype=str)
         for epoch in range(num_epochs):
@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     elif sys.argv[2] == 'eval':
         model.eval()
-        model.load_state_dict(torch.load('model/deeplab101_epoch2_chenxi.pth'), strict=False)
+        model.load_state_dict(torch.load('model/deeplab101_trainaug.pth'), strict=False)
         if use_gpu:
             model = model.cuda()
 
@@ -170,18 +170,17 @@ if __name__ == "__main__":
 
             inputs = inputs.unsqueeze(0)
 
-            # stride = math.ceil((inputs.size(3) / len(model.layer0_0.device_ids)) / 8) * 8
-            # temp = list()
-            # for d in range(len(model.layer0_0.device_ids)):
-            #     if d < len(model.layer0_0.device_ids) - 1:
-            #         temp.append((inputs[:, :, :, stride * d: stride * (d + 1)].cuda(model.layer0_0.device_ids[d]),))
-            #     else:
-            #         temp.append((inputs[:, :, :, stride * d:].cuda(model.layer0_0.device_ids[d]),))
-            #
-            # outputs = model(*temp)
-            # outputs = torch.cat([outputs[d][0].cuda(model.layer0_0.device_ids[0])
-            #                      for d in range(len(model.layer0_0.device_ids))], dim=3)
-            outputs = model.forward2(inputs)
+            stride = math.ceil((inputs.size(3) / len(model.layer0_0.device_ids)) / 8) * 8
+            temp = list()
+            for d in range(len(model.layer0_0.device_ids)):
+                if d < len(model.layer0_0.device_ids) - 1:
+                    temp.append((inputs[:, :, :, stride * d: stride * (d + 1)].cuda(model.layer0_0.device_ids[d]),))
+                else:
+                    temp.append((inputs[:, :, :, stride * d:].cuda(model.layer0_0.device_ids[d]),))
+
+            outputs = model(*temp)
+            outputs = torch.cat([outputs[d][0].cuda(model.layer0_0.device_ids[0])
+                                 for d in range(len(model.layer0_0.device_ids))], dim=3)
 
             outputs_up = nn.UpsamplingBilinear2d((w, h))(outputs)
             _, pred = torch.max(outputs_up, 1)
