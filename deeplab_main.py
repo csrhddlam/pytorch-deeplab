@@ -97,13 +97,13 @@ if __name__ == "__main__":
                 im = datasets.folder.default_loader(pascal_dir + imname)
                 label = Image.open(pascal_dir + labelname)
                 inputs = data_transforms(im)
-                if len(model.layer0_0.device_ids) > 1:
+                if len(model.layer0_0.device_ids) == 1:
                     inputs = inputs.cuda()
                 inputs = inputs.unsqueeze(0)
                 inputs.requires_grad = True
 
-                width = 1000  # fake images
-                height = 100
+                width = 2560  # fake images
+                height = 1600
                 inputs = torch.arange(3 * width * height).view(1, 3, height, width)
                 stride = math.ceil((inputs.size(3) / len(model.layer0_0.device_ids)) / 8) * 8
                 temp = list()
@@ -140,13 +140,20 @@ if __name__ == "__main__":
                 loss.backward()
                 if i % iter_size == iter_size - 1:
                     optimizer.step()
-
                 print(str(datetime.datetime.now()) + '\t'
                       'epoch: {0}\t'
                       'iter: {1}/{2}\t'
                       'lr: {3:.6f}\t'
                       'loss: {loss.val:.4f} ({loss.avg:.4f})'.format(
                       epoch+1, i+1, len(lines), lr, loss=losses))
+                if i == 11:
+                    import time
+                    torch.cuda.synchronize()
+                    start = time.time()
+                if i == 21:
+                    torch.cuda.synchronize()
+                    end = time.time()
+                    print(end - start)
                 # prof.export_chrome_trace('trace')
 
             torch.save(model.state_dict(), model_fname % (epoch+1))
