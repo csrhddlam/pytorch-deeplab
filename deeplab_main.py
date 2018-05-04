@@ -63,7 +63,7 @@ if __name__ == "__main__":
         iter_size = 10
         base_lr = 0.00025 / iter_size 
         power = 0.9
-        criterion = nn.CrossEntropyLoss().cuda()
+        criterion = nn.CrossEntropyLoss().cuda(model.layer0_0.device_ids[-1])
 
         optimizer = optim.SGD([{'params': model.conv1.parameters()},
             {'params': model.bn1.parameters()},
@@ -97,10 +97,8 @@ if __name__ == "__main__":
                 im = datasets.folder.default_loader(pascal_dir + imname)
                 label = Image.open(pascal_dir + labelname)
                 inputs = data_transforms(im)
-                if use_gpu:
-                    inputs = Variable(inputs.cuda())
-                else:
-                    inputs = Variable(inputs)
+                if len(model.layer0_0.device_ids) > 1:
+                    inputs = inputs.cuda()
                 inputs = inputs.unsqueeze(0)
                 inputs.requires_grad = True
 
@@ -116,14 +114,14 @@ if __name__ == "__main__":
 
                 outputs = model(*temp)
 
-                outputs = torch.cat([outputs[d][0].cuda(model.layer0_0.device_ids[0])
+                outputs = torch.cat([outputs[d][0].cuda(model.layer0_0.device_ids[-1])
                                      for d in range(len(model.layer0_0.device_ids))], dim=3)
 
                 w, h = outputs.size()[2], outputs.size()[3]
                 label_down = label.resize((h, w), Image.NEAREST)
                 target_down = torch.LongTensor(np.array(label_down).astype(np.int64))
                 if use_gpu:
-                    target_down = Variable(target_down.cuda(model.layer0_0.device_ids[0]))
+                    target_down = Variable(target_down.cuda(model.layer0_0.device_ids[-1]))
                 else:
                     target_down = Variable(target_down)
 
@@ -160,13 +158,12 @@ if __name__ == "__main__":
 
         lines = np.loadtxt(list_dir + 'val_id.txt', dtype=str)
         for i, imname in enumerate(lines):
+            print(imname)
             im = datasets.folder.default_loader(pascal_dir + 'JPEGImages/' + imname + '.jpg')
             w, h = np.shape(im)[0], np.shape(im)[1]
             inputs = data_transforms(im)
-            if use_gpu:
-                inputs = Variable(inputs.cuda())
-            else:
-                inputs = Variable(inputs)
+            if len(model.layer0_0.device_ids) > 1:
+                inputs = inputs.cuda()
 
             inputs = inputs.unsqueeze(0)
 
