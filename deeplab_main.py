@@ -14,6 +14,7 @@ import sys
 import deeplab
 from PIL import Image
 import math
+import datetime
 
 os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
 
@@ -47,8 +48,8 @@ if __name__ == "__main__":
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-    pascal_dir = '/mnt/4T-HD/why/Data/VOCdevkit2012/VOC2012/'
-    list_dir = '/mnt/4T-HD/why/Data/deeplab_list/'
+    pascal_dir = './VOC2012/'
+    list_dir = './deeplab_list/'
     model_fname = 'model/deeplab101_epoch%d.pth'
 
     model = getattr(deeplab, 'resnet101')()
@@ -102,8 +103,7 @@ if __name__ == "__main__":
                 inputs = inputs.unsqueeze(0)
                 inputs.requires_grad = True
 
-                # scattered_inputs = tuple(scatter((inputs,), model.layer0_0.device_ids))
-                # im_size = 1000
+                # im_size = 1200  # fake images
                 # inputs = torch.arange(3 * im_size * im_size).view(1, 3, im_size, im_size)
                 stride = math.ceil((inputs.size(3) / len(model.layer0_0.device_ids)) / 8) * 8
                 temp = list()
@@ -145,7 +145,8 @@ if __name__ == "__main__":
                 if i % iter_size == iter_size - 1:
                     optimizer.step()
 
-                print('epoch: {0}\t'
+                print(str(datetime.datetime.now()) + '\t'
+                      'epoch: {0}\t'
                       'iter: {1}/{2}\t'
                       'lr: {3:.6f}\t'
                       'loss: {loss.val:.4f} ({loss.avg:.4f})'.format(

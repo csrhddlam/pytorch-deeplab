@@ -11,6 +11,9 @@ class DataParallel(torch.nn.DataParallel):
 
     def forward(self, *inputs):
         # 0, 1, 2, 3
+        if len(self.device_ids) == 1:
+            return ((self.module(*inputs[0]), ), )
+
         n = len(inputs)
         temp = [[[]] for _ in range(n)]
         for i in range(n - 1):

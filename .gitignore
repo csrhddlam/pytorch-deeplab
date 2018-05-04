@@ -6,3 +6,5 @@ data/*.caffemodel
 *.pth
 *.png
 .idea
+VOC2012
+deeplab_list
