@@ -86,6 +86,7 @@ if __name__ == "__main__":
         for epoch in range(num_epochs):
             lines = np.random.permutation(lines)
             for i, line in enumerate(lines):
+                # with torch.autograd.profiler.profile(use_cuda=True) as prof:
                 lr = base_lr * math.pow(1 - float(epoch * len(lines) + i) / (num_epochs * len(lines)), power)
                 for g in range(6):
                     optimizer.param_groups[g]['lr'] = lr
@@ -151,6 +152,7 @@ if __name__ == "__main__":
                       'lr: {3:.6f}\t'
                       'loss: {loss.val:.4f} ({loss.avg:.4f})'.format(
                       epoch+1, i+1, len(lines), lr, loss=losses))
+                # prof.export_chrome_trace('trace')
 
             torch.save(model.state_dict(), model_fname % (epoch+1))
 
