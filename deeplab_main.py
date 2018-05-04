@@ -102,8 +102,9 @@ if __name__ == "__main__":
                 inputs = inputs.unsqueeze(0)
                 inputs.requires_grad = True
 
-                # im_size = 1200  # fake images
-                # inputs = torch.arange(3 * im_size * im_size).view(1, 3, im_size, im_size)
+                width = 1000  # fake images
+                height = 100
+                inputs = torch.arange(3 * width * height).view(1, 3, height, width)
                 stride = math.ceil((inputs.size(3) / len(model.layer0_0.device_ids)) / 8) * 8
                 temp = list()
                 for d in range(len(model.layer0_0.device_ids)):
