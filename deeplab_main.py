@@ -116,12 +116,8 @@ if __name__ == "__main__":
 
                 outputs = model(*temp)
 
-                outputs[0][0].register_hook(extract)
                 outputs = torch.cat([outputs[d][0].cuda(model.layer0_0.device_ids[0])
                                      for d in range(len(model.layer0_0.device_ids))], dim=3)
-                t = torch.ones(outputs.size()).cuda(0)
-                t.requires_grad = True
-                outputs += t
 
                 w, h = outputs.size()[2], outputs.size()[3]
                 label_down = label.resize((h, w), Image.NEAREST)
@@ -158,7 +154,7 @@ if __name__ == "__main__":
 
     elif sys.argv[2] == 'eval':
         model.eval()
-        model.load_state_dict(torch.load('model/deeplab101_epoch2.pth'))
+        model.load_state_dict(torch.load('model/deeplab101_epoch2_chenxi.pth'), strict=False)
         if use_gpu:
             model = model.cuda()
 
@@ -171,7 +167,22 @@ if __name__ == "__main__":
                 inputs = Variable(inputs.cuda())
             else:
                 inputs = Variable(inputs)
-            outputs = model(inputs.unsqueeze(0))
+
+            inputs = inputs.unsqueeze(0)
+
+            # stride = math.ceil((inputs.size(3) / len(model.layer0_0.device_ids)) / 8) * 8
+            # temp = list()
+            # for d in range(len(model.layer0_0.device_ids)):
+            #     if d < len(model.layer0_0.device_ids) - 1:
+            #         temp.append((inputs[:, :, :, stride * d: stride * (d + 1)].cuda(model.layer0_0.device_ids[d]),))
+            #     else:
+            #         temp.append((inputs[:, :, :, stride * d:].cuda(model.layer0_0.device_ids[d]),))
+            #
+            # outputs = model(*temp)
+            # outputs = torch.cat([outputs[d][0].cuda(model.layer0_0.device_ids[0])
+            #                      for d in range(len(model.layer0_0.device_ids))], dim=3)
+            outputs = model.forward2(inputs)
+
             outputs_up = nn.UpsamplingBilinear2d((w, h))(outputs)
             _, pred = torch.max(outputs_up, 1)
             pred = pred.data.cpu().numpy().squeeze().astype(np.uint8)

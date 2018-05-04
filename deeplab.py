@@ -132,10 +132,10 @@ class ResNet(nn.Module):
         self.layer1_0 = DataParallel(self.layer1, input_pad=8, output_left_cut=8, output_right_cut=8)
         self.layer2_0 = DataParallel(self.layer2, input_pad=8, output_left_cut=4, output_right_cut=4)
         layer3 = list(self.layer3.children())
-        self.layer3_0 = DataParallel(nn.Sequential(*layer3[0: 6]), input_pad=8, output_left_cut=8, output_right_cut=8)
+        self.layer3_0 = DataParallel(nn.Sequential(*layer3[: 6]), input_pad=8, output_left_cut=8, output_right_cut=8)
         self.layer3_1 = DataParallel(nn.Sequential(*layer3[6: 12]), input_pad=8, output_left_cut=8, output_right_cut=8)
         self.layer3_2 = DataParallel(nn.Sequential(*layer3[12: 18]), input_pad=8, output_left_cut=8, output_right_cut=8)
-        self.layer3_3 = DataParallel(nn.Sequential(*layer3[18: 23]), input_pad=8, output_left_cut=8, output_right_cut=8)
+        self.layer3_3 = DataParallel(nn.Sequential(*layer3[18:]), input_pad=8, output_left_cut=8, output_right_cut=8)
         self.layer4_0 = DataParallel(self.layer4, input_pad=12, output_left_cut=12, output_right_cut=12)
         self.layer5_0 = DataParallel(Summation(self.fc1_voc12_c0, self.fc1_voc12_c1, self.fc1_voc12_c2, self.fc1_voc12_c3),
                                      input_pad=24, output_left_cut=24, output_right_cut=24)
@@ -177,6 +177,27 @@ class ResNet(nn.Module):
         # print(x[0][0].size(), x[1][0].size())
         x = self.layer5_0(*x)
         # print(x[0][0].size(), x[1][0].size())
+        return x
+
+    def forward2(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x0 = self.fc1_voc12_c0(x)
+        x1 = self.fc1_voc12_c1(x)
+        x2 = self.fc1_voc12_c2(x)
+        x3 = self.fc1_voc12_c3(x)
+
+        x = torch.add(x0, x1)
+        x = torch.add(x, x2)
+        x = torch.add(x, x3)
         return x
 
 
