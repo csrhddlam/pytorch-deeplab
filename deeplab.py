@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
+from DataParallel import DataParallel
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -44,6 +45,17 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
 
         return out
+
+
+class Summation(nn.Sequential):
+    def forward(self, input):
+        output = None
+        for module in self._modules.values():
+            if output is None:
+                output = module(input)
+            else:
+                output += module(input)
+        return output
 
 
 class Bottleneck(nn.Module):
@@ -93,11 +105,11 @@ class ResNet(nn.Module):
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1, ceil_mode=True) # change
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1, ceil_mode=True)  # change
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2) # deeplab change
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4) # deeplab change
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)  # deeplab change
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4)  # deeplab change
         self.fc1_voc12_c0 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3, 
                                       stride=1, dilation=6, padding=6) # deeplab change
         self.fc1_voc12_c1 = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=3,
@@ -114,6 +126,19 @@ class ResNet(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
+
+        self.layer0_0 = DataParallel(nn.Sequential(self.conv1, self.bn1, self.relu, self.maxpool),
+                                     input_pad=8, output_left_cut=2, output_right_cut=3)
+        self.layer1_0 = DataParallel(self.layer1, input_pad=8, output_left_cut=8, output_right_cut=8)
+        self.layer2_0 = DataParallel(self.layer2, input_pad=8, output_left_cut=4, output_right_cut=4)
+        layer3 = list(self.layer3.children())
+        self.layer3_0 = DataParallel(nn.Sequential(*layer3[0: 6]), input_pad=8, output_left_cut=8, output_right_cut=8)
+        self.layer3_1 = DataParallel(nn.Sequential(*layer3[6: 12]), input_pad=8, output_left_cut=8, output_right_cut=8)
+        self.layer3_2 = DataParallel(nn.Sequential(*layer3[12: 18]), input_pad=8, output_left_cut=8, output_right_cut=8)
+        self.layer3_3 = DataParallel(nn.Sequential(*layer3[18: 23]), input_pad=8, output_left_cut=8, output_right_cut=8)
+        self.layer4_0 = DataParallel(self.layer4, input_pad=12, output_left_cut=12, output_right_cut=12)
+        self.layer5_0 = DataParallel(Summation(self.fc1_voc12_c0, self.fc1_voc12_c1, self.fc1_voc12_c2, self.fc1_voc12_c3),
+                                     input_pad=24, output_left_cut=24, output_right_cut=24)
 
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1):
         downsample = None
@@ -132,26 +157,26 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x0 = self.fc1_voc12_c0(x)
-        x1 = self.fc1_voc12_c1(x)
-        x2 = self.fc1_voc12_c2(x)
-        x3 = self.fc1_voc12_c3(x)
-
-        x = torch.add(x0, x1)
-        x = torch.add(x, x2)
-        x = torch.add(x, x3)
-
+    def forward(self, *x):
+        # print(x[0][0].size(), x[1][0].size())
+        x = self.layer0_0(*x)
+        # print(x[0][0].size(), x[1][0].size())
+        x = self.layer1_0(*x)
+        # print(x[0][0].size(), x[1][0].size())
+        x = self.layer2_0(*x)
+        # print(x[0][0].size(), x[1][0].size())
+        x = self.layer3_0(*x)
+        # print(x[0][0].size(), x[1][0].size())
+        x = self.layer3_1(*x)
+        # print(x[0][0].size(), x[1][0].size())
+        x = self.layer3_2(*x)
+        # print(x[0][0].size(), x[1][0].size())
+        x = self.layer3_3(*x)
+        # print(x[0][0].size(), x[1][0].size())
+        x = self.layer4_0(*x)
+        # print(x[0][0].size(), x[1][0].size())
+        x = self.layer5_0(*x)
+        # print(x[0][0].size(), x[1][0].size())
         return x
 
 

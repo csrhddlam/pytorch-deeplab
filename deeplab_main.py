@@ -7,6 +7,8 @@ import numpy as np
 import torchvision
 from torchvision import datasets, models, transforms
 import matplotlib.pyplot as plt
+from DataParallel import DataParallel
+from torch.nn.parallel.scatter_gather import scatter_kwargs, gather, scatter
 import os
 import sys
 import deeplab
@@ -33,6 +35,11 @@ class AverageMeter(object):
         # self.avg = self.sum / self.count
         self.avg = self.avg * 0.99 + self.val * 0.01
 
+
+def extract(xVar):
+    a = 0
+
+
 if __name__ == "__main__":
     use_gpu = torch.cuda.is_available()
     data_transforms = transforms.Compose([
@@ -47,8 +54,8 @@ if __name__ == "__main__":
     model = getattr(deeplab, 'resnet101')()
 
     if sys.argv[2] == 'train':
-        model.eval() # in order to fix batchnorm
-        model.load_state_dict(torch.load('model/deeplab101_init.pth'))
+        model.eval()  # in order to fix batchnorm
+        model.load_state_dict(torch.load('model/deeplab101_init.pth'), strict=False)
         if use_gpu:
             model = model.cuda()
         num_epochs = 2
@@ -56,6 +63,7 @@ if __name__ == "__main__":
         base_lr = 0.00025 / iter_size 
         power = 0.9
         criterion = nn.CrossEntropyLoss().cuda()
+
         optimizer = optim.SGD([{'params': model.conv1.parameters()},
             {'params': model.bn1.parameters()},
             {'params': model.layer1.parameters()},
@@ -91,12 +99,34 @@ if __name__ == "__main__":
                     inputs = Variable(inputs.cuda())
                 else:
                     inputs = Variable(inputs)
-                outputs = model(inputs.unsqueeze(0))
+                inputs = inputs.unsqueeze(0)
+                inputs.requires_grad = True
+
+                # scattered_inputs = tuple(scatter((inputs,), model.layer0_0.device_ids))
+                # im_size = 1000
+                # inputs = torch.arange(3 * im_size * im_size).view(1, 3, im_size, im_size)
+                stride = math.ceil((inputs.size(3) / len(model.layer0_0.device_ids)) / 8) * 8
+                temp = list()
+                for d in range(len(model.layer0_0.device_ids)):
+                    if d < len(model.layer0_0.device_ids) - 1:
+                        temp.append((inputs[:, :, :, stride * d: stride * (d + 1)].cuda(model.layer0_0.device_ids[d]), ))
+                    else:
+                        temp.append((inputs[:, :, :, stride * d:].cuda(model.layer0_0.device_ids[d]), ))
+
+                outputs = model(*temp)
+
+                outputs[0][0].register_hook(extract)
+                outputs = torch.cat([outputs[d][0].cuda(model.layer0_0.device_ids[0])
+                                     for d in range(len(model.layer0_0.device_ids))], dim=3)
+                t = torch.ones(outputs.size()).cuda(0)
+                t.requires_grad = True
+                outputs += t
+
                 w, h = outputs.size()[2], outputs.size()[3]
                 label_down = label.resize((h, w), Image.NEAREST)
                 target_down = torch.LongTensor(np.array(label_down).astype(np.int64))
                 if use_gpu:
-                    target_down = Variable(target_down.cuda())
+                    target_down = Variable(target_down.cuda(model.layer0_0.device_ids[0]))
                 else:
                     target_down = Variable(target_down)
 
